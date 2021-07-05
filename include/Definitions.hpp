@@ -2,6 +2,7 @@
 #define __DEFINITIONS_HPP__
 
 #include <cmath>
+#include <string>
 
 /******************
  *   6   2   5
@@ -42,5 +43,18 @@ typedef struct Node {
 typedef struct Vec {
     double comp[N_DIM];
 } Vec;
+
+typedef struct Inputs {
+    size_t x_dim;
+    size_t y_dim;
+    size_t timesteps;
+    size_t plot_interval;
+
+    double reynolds;
+    double wall_vel;
+
+    std::string case_name;
+    std::string dict_name;
+} Inputs;
 
 #endif // __DEFINITIONS_HPP__

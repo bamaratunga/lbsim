@@ -10,17 +10,26 @@
 #include "Processes.hpp"
 
 
-int main(){
+int main(int argn, char **args){
+
+    if (argn <= 1) {
+        std::cout << "ERROR: No input file is provided. Exiting..." << std::endl;
+        exit(EXIT_FAILURE);
+    }
+
+    std::string file_name{args[1]};
+    Inputs input;
+    Utils::read_inputs(file_name, input);
 
     /// DIMENSIONS
-    size_t Nx      = 50;         // number of cells in x-direction
-    size_t Ny      = 50;         // number of cells in y-direction
-    size_t Nt      = 2000;        // number of time steps
-    size_t plot_interval = 100;   // How many timesteps for the next plot update
+    size_t Nx      = input.x_dim;        // number of cells in x-direction
+    size_t Ny      = input.y_dim;        // number of cells in y-direction
+    size_t Nt      = input.timesteps;    // number of time steps
+    size_t plot_interval = input.plot_interval;   // How many timesteps for the next plot update
 
     /// FLOW PARAMETERS
-    double Re      = 300;               // Reynolds number (Main flow parameter)0000
-    double uMax    = 0.08;              // Velocity of lid
+    double Re      = input.reynolds;    // Reynolds number (Main flow parameter)
+    double uMax    = input.wall_vel;    // Velocity of lid
     double nu      = uMax * Nx / Re;    // kinematic viscosity (is chosen such that the given Raynolds number is achieved)
     double omega   = 2 / (6 * nu + 1);  // relaxation parameter
 
@@ -81,7 +90,7 @@ int main(){
         Processes::doStreaming(fIn, fOut, Nx, Ny);
 
         if(t_step % plot_interval == 0){
-            Utils::writeVtkOutput(U, Nx, Ny, t_step);
+            Utils::writeVtkOutput(U, Nx, Ny, t_step, 0, input.case_name, input.dict_name);
         }
     }
 }
