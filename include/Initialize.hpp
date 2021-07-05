@@ -6,9 +6,9 @@
 
 namespace Initialize {
 
-    void initMovingwall(Matrix<Vec> * U);
+    void initMovingwall(Matrix<Vec>& U, double uMax, size_t Nx);
 
-    void initDistfunc(Matrix<Node> * fIn, Matrix<Vec> * U, Matrix<double> * RHO,
+    void initDistfunc(Matrix<Node>& fIn, Matrix<Vec>& U, Matrix<double>& RHO,
                                                             size_t Nx, size_t Ny);
 
 } // namespace Initialzie

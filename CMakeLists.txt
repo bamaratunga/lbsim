@@ -47,7 +47,7 @@ endif()
 
 # Creating the executable of our project and the required dependencies
 # the executable is called lbsim
-add_executable(lbsim src/main.cpp src/Case.cpp src/Boundary.cpp src/Initialize.cpp src/Processes.cpp)
+add_executable(lbsim src/Case.cpp src/Boundary.cpp src/Initialize.cpp src/Processes.cpp)
 
 ## Compiler options
 # Turn on warnings

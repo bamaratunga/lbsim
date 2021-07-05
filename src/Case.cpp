@@ -13,10 +13,10 @@
 int main(){
 
     /// DIMENSIONS
-    int Nx      = 4;         // number of cells in x-direction
-    int Ny      = 4;         // number of cells in y-direction
-    int Nt      = 1;        // number of time steps
-    int plot_interval = 100;   // How many timesteps for the next plot update
+    size_t Nx      = 50;         // number of cells in x-direction
+    size_t Ny      = 50;         // number of cells in y-direction
+    size_t Nt      = 2000;        // number of time steps
+    size_t plot_interval = 100;   // How many timesteps for the next plot update
 
     /// FLOW PARAMETERS
     double Re      = 300;               // Reynolds number (Main flow parameter)0000
@@ -53,9 +53,9 @@ int main(){
 
     /// SET INITIAL CONDITIONS
     // Moving wall velocity
-    initMovingwall(&U);
+    Initialize::initMovingwall(U, uMax, Nx);
     // Microscopic quantities
-    initDistfunc(&fIn, &U, &RHO, Nx, Ny);
+    Initialize::initDistfunc(fIn, U, RHO, Nx, Ny);
 
 /*************************************************************************************/
 
@@ -64,24 +64,24 @@ int main(){
     for(size_t t_step = 0; t_step < Nt; ++t_step){
 
         /// CALCULATE MACROSCOPIC QUANTITIES FOR EACH CELL
-        calcQuantities(&fIn, &U, &RHO, Nx, Ny);
+        Processes::calcQuantities(fIn, U, RHO, Nx, Ny);
 
         /// SETTING BOUNDARIES
         // Moving wall
-        setMovingwall(&fIn, &U, &RHO, uMax, Nx, Ny);
+        Boundary::setMovingwall(fIn, U, RHO, uMax, Nx);
 
         /// COLLISION STEP
-        doCollision(&fEq, &Out, &U, &RHO, omega, Nx, Ny);
+        Processes::doCollision(fEq, fOut, U, RHO, omega, Nx, Ny);
 
         /// SETTING BOUNDARIES
         // Set bounce back cells
-        setBounceback(&fIn, &fOut, Nx, Ny);
+        Boundary::setBounceback(fIn, fOut, Nx, Ny);
 
         // STREAMING STEP
-        doStreaming(&fIn, &fOut, &Nx, &Ny);
+        Processes::doStreaming(fIn, fOut, Nx, Ny);
 
         if(t_step % plot_interval == 0){
-            writeVtkOutput(U, Nx, Ny, t_step);
+            Utils::writeVtkOutput(U, Nx, Ny, t_step);
         }
     }
 }

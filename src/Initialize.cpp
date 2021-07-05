@@ -4,7 +4,7 @@
 
 namespace Initialize {
 
-void initMovingwall(Matrix<Vec> * U){
+void initMovingwall(Matrix<Vec>& U, double uMax, size_t Nx){
     /// Initialize Moving Wall
     for(size_t i = 0; i < Nx + 2; ++i){
          U(i, 0).comp[0] = uMax;
@@ -13,7 +13,7 @@ void initMovingwall(Matrix<Vec> * U){
 
 // MICROSCOPIC INITIAL CONDITION
 // TODO: use CS
-void initDistfunc(Matrix<Node> * fIn, Matrix<Vec> * U, Matrix<double> * RHO,
+void initDistfunc(Matrix<Node>& fIn, Matrix<Vec>& U, Matrix<double>& RHO,
                                                         size_t Nx, size_t Ny){
     double c_u;
     for (size_t i = 0; i < Nx + 2; ++i) {

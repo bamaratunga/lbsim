@@ -12,21 +12,24 @@
 #include <vtkStructuredGridWriter.h>
 #include <vtkTuple.h>
 
-void writeVtkOutput(Matrix<Vec> U, unsigned int Nx, unsigned int Ny, unsigned int timestep){
+namespace Utils{
+
+void writeVtkOutput(Matrix<Vec>& U, unsigned int Nx, unsigned int Ny, unsigned int timestep){
 
    // Create a new structured grid
     vtkSmartPointer<vtkStructuredGrid> structuredGrid = vtkSmartPointer<vtkStructuredGrid>::New();
     // Create grid
     vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
 
-    double dx = 1 / (Nx + 2);
-    double dy = 1 / (Ny + 2);
+    double dx = 1.0 / (Nx + 2);
+    double dy = 1.0 / (Ny + 2);
 
     double x = 0;
     double y = 0;
 
-    for (int col = 0; col < Ny + 2; col++) {
-        for (int row = 0; row < Nx + 2; row++) {
+    for (size_t col = 0; col < Ny + 2; col++) {
+        x = 0;
+        for (size_t row = 0; row < Nx + 2; row++) {
             points->InsertNextPoint(x, y, 0);
             x += dx;
         }
@@ -47,8 +50,8 @@ void writeVtkOutput(Matrix<Vec> U, unsigned int Nx, unsigned int Ny, unsigned in
     vel[2] = 0; // Set z component to 0
 
     // Print Velocity from bottom to top
-    for (int j = 0; j < Ny + 2; j++) {
-        for (int i = 0; i < Nx + 2; i++) {
+    for (size_t j = 0; j < Ny + 2; j++) {
+        for (size_t i = 0; i < Nx + 2; i++) {
             vel[0] = U(i,j).comp[0];
             vel[1] = U(i,j).comp[1];
             Velocity->InsertNextTuple(vel);
@@ -62,11 +65,13 @@ void writeVtkOutput(Matrix<Vec> U, unsigned int Nx, unsigned int Ny, unsigned in
     vtkSmartPointer<vtkStructuredGridWriter> writer = vtkSmartPointer<vtkStructuredGridWriter>::New();
 
     // Create Filename
-    std::string outputname = "output" + "." + std::to_string(timestep) + ".vtk";
+    std::string outputname = "output." + std::to_string(timestep) + ".vtk";
 
     writer->SetFileName(outputname.c_str());
     writer->SetInputData(structuredGrid);
     writer->Write();
 }
+
+} // namespace Utils
 
 #endif //__UTILS_HPP__

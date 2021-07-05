@@ -1,12 +1,11 @@
 #include "Definitions.hpp"
 #include "Matrix.hpp"
-#include "Boundary.cpp"
+#include "Boundary.hpp"
 
 namespace Boundary{
 /// SETTING BOUNDARIES
 // Moving wall
-void setMovingwall(Matrix<Node> * fIn, Matrix<Vec> * U, Matrix<double> * RHO,
-                                          double uMax, size_t Nx, size_t Ny){
+void setMovingwall(Matrix<Node>& fIn, Matrix<Vec>& U, Matrix<double>& RHO, double uMax, size_t Nx){
     for (size_t i = 0; i < Nx + 2; ++i) {
         // Macroscopic Dirichlet boundary conditions
         U(i, 0).comp[0] = uMax;
@@ -25,7 +24,7 @@ void setMovingwall(Matrix<Node> * fIn, Matrix<Vec> * U, Matrix<double> * RHO,
 
 
 // Set bounce back cells
-void setBounceback(Matrix<Node> * fIn, Matrix<Node> * fOut, size_t Nx, size_t Ny){
+void setBounceback(Matrix<Node>& fIn, Matrix<Node>& fOut, size_t Nx, size_t Ny){
     for(size_t i = 0; i < Nx + 2; ++i){
         for(size_t q = 0; q < N_DIRECTIONS; ++q){
             fOut(i, Ny + 1).dir[q] = fIn(i, Ny + 1).dir[OPP[q]];

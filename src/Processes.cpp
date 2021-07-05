@@ -48,7 +48,7 @@ void computePostCollisionDistributions(Node * currentNode, const Node * eqField,
     }
 }
 
-void calcQuantities(Matrix<Node> * fIn, Matrix<Vec> * U, Matrix<double> * RHO,
+void calcQuantities(Matrix<Node>& fIn, Matrix<Vec>& U, Matrix<double>& RHO,
                                                         size_t Nx, size_t Ny){
     /// CALCULATE MACROSCOPIC QUANTITIES FOR EACH CELL
     for (size_t i = 0; i < Nx + 2; ++i) {
@@ -59,7 +59,7 @@ void calcQuantities(Matrix<Node> * fIn, Matrix<Vec> * U, Matrix<double> * RHO,
     }
 }
 
-void doCollision(Matrix<Node> * fEq, Matrix<Node> * fOut, Matrix<Vec> * U, Matrix<double> * RHO,
+void doCollision(Matrix<Node>& fEq, Matrix<Node>& fOut, Matrix<Vec>& U, Matrix<double>& RHO,
                                                            double omega, size_t Nx, size_t Ny) {
     /// COLLISION STEP
     for (size_t i = 0; i < Nx + 2; ++i) {
@@ -70,7 +70,7 @@ void doCollision(Matrix<Node> * fEq, Matrix<Node> * fOut, Matrix<Vec> * U, Matri
     }
 }
 
-void doStreaming(Matrix<Node> * fIn, Matrix<Node> * fOut, size_t Nx, size_t Ny){
+void doStreaming(Matrix<Node>& fIn, Matrix<Node>& fOut, size_t Nx, size_t Ny){
 
     int Cx, Cy;
     for (size_t j = 0; j < Ny + 2; ++j) {
