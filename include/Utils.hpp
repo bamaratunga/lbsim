@@ -101,10 +101,10 @@ void writeVtkOutput(Matrix<Vec>& U, size_t Nx, size_t Ny, size_t timestep, size_
     { y += dy; }
     { x += dx; }
 
-    for (size_t col = 0; col < Ny + 1; col++) {
+    for (size_t col = 1; col < Ny + 1; col++) {
         x = 0;
         { x += dx; }
-        for (size_t row = 0; row < Nx + 1; row++) {
+        for (size_t row = 1; row < Nx + 1; row++) {
             points->InsertNextPoint(x, y, 0);
             x += dx;
         }
@@ -112,7 +112,7 @@ void writeVtkOutput(Matrix<Vec>& U, size_t Nx, size_t Ny, size_t timestep, size_
     }
 
     // Specify the dimensions of the grid
-    structuredGrid->SetDimensions(Nx + 1, Ny + 1, 1);
+    structuredGrid->SetDimensions(Nx, Ny, 1);
     structuredGrid->SetPoints(points);
 
     // Velocity Array
@@ -125,7 +125,7 @@ void writeVtkOutput(Matrix<Vec>& U, size_t Nx, size_t Ny, size_t timestep, size_
     vel[2] = 0; // Set z component to 0
 
     // Print Velocity from bottom to top
-    for (size_t j = 1; j < Ny + 1; j++) {
+    for (size_t j = Ny; j > 0; j--) {
         for (size_t i = 1; i < Nx + 1; i++) {
             vel[0] = U(i,j).comp[0];
             vel[1] = U(i,j).comp[1];

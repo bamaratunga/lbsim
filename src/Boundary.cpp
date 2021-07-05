@@ -17,14 +17,14 @@ void setMovingwall(Matrix<Node>& fIn, Matrix<Vec>& U, Matrix<double>& RHO, doubl
         fIn(i, 0).dir[4] = fIn(i, 0).dir[2] - 2 / 3 * RHO(i, 0) * U(i, 0).comp[1];
         fIn(i, 0).dir[7] = fIn(i, 0).dir[5] + 0.5 * (fIn(i, 0).dir[1] - fIn(i, 0).dir[3])
                     - 0.5 * (RHO(i, 0) * U(i, 0).comp[0]) - 1/6 * (RHO(i, 0) * U(i, 0).comp[1]);
-        fIn(i, 0).dir[8] = fIn(i, 0).dir[6] + 0.5 * (fIn(i, 0).dir[1] - fIn(i, 0).dir[3])
+        fIn(i, 0).dir[8] = fIn(i, 0).dir[6] - 0.5 * (fIn(i, 0).dir[1] - fIn(i, 0).dir[3])
                     + 0.5 * (RHO(i, 0) * U(i, 0).comp[0]) - 1/6 * (RHO(i, 0) * U(i, 0).comp[1]);
     }
 }
 
 
 // Set bounce back cells
-void setBounceback(Matrix<Node>& fIn, Matrix<Node>& fOut, size_t Nx, size_t Ny){
+void setBounceback(Matrix<Node>& fOut, Matrix<Node>& fIn, size_t Nx, size_t Ny){
     for(size_t i = 0; i < Nx + 2; ++i){
         for(size_t q = 0; q < N_DIRECTIONS; ++q){
             fOut(i, Ny + 1).dir[q] = fIn(i, Ny + 1).dir[OPP[q]];

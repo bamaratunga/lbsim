@@ -41,10 +41,10 @@ void computefEq(Node * eqField, const Vec * velocity, double density){
 	}
 }
 
-void computePostCollisionDistributions(Node * currentNode, const Node * eqField, double omega){
+void computePostCollisionDistributions(Node * outputNode, Node * currentNode, const Node * eqField, double omega){
 
     for (int q = 0; q < N_DIRECTIONS; ++q) {
-        currentNode->dir[q] = currentNode->dir[q] - omega *( currentNode->dir[q] - eqField->dir[q] );
+        outputNode->dir[q] = currentNode->dir[q] - omega *( currentNode->dir[q] - eqField->dir[q] );
     }
 }
 
@@ -59,18 +59,18 @@ void calcQuantities(Matrix<Node>& fIn, Matrix<Vec>& U, Matrix<double>& RHO,
     }
 }
 
-void doCollision(Matrix<Node>& fEq, Matrix<Node>& fOut, Matrix<Vec>& U, Matrix<double>& RHO,
+void doCollision(Matrix<Node>& fOut, Matrix<Node>& fIn, Matrix<Node>& fEq, Matrix<Vec>& U, Matrix<double>& RHO,
                                                            double omega, size_t Nx, size_t Ny) {
     /// COLLISION STEP
     for (size_t i = 0; i < Nx + 2; ++i) {
         for (size_t j = 0; j < Ny + 2; ++j) {
-            computefEq( &fEq(i, j), &U(i, j), RHO(i, j));
-            computePostCollisionDistributions( &fOut(i, j), &fEq(i,j), omega);
+            computefEq( &fEq(i, j), &U(i, j), RHO(i, j) );
+            computePostCollisionDistributions( &fOut(i, j), &fIn(i, j), &fEq(i,j), omega );
         }
     }
 }
 
-void doStreaming(Matrix<Node>& fIn, Matrix<Node>& fOut, size_t Nx, size_t Ny){
+void doStreaming(Matrix<Node>& fOut, Matrix<Node>& fIn, size_t Nx, size_t Ny){
 
     int Cx, Cy;
     for (size_t j = 0; j < Ny + 2; ++j) {
@@ -78,8 +78,7 @@ void doStreaming(Matrix<Node>& fIn, Matrix<Node>& fOut, size_t Nx, size_t Ny){
             for (size_t q = 0; q < N_DIRECTIONS; ++q) {
                 Cx = LATTICE_VELOCITIES[q][0];
                 Cy = LATTICE_VELOCITIES[q][1];
-                fIn((i + Cx + Nx) % Nx, (j + Cy + Ny) % Ny).dir[q]
-                                            = fOut(i, j).dir[q];
+                fOut(i, j).dir[q] = fIn( (i - Cx + Nx + 2) % (Nx + 2), (j - Cy + Ny + 2) % (Ny + 2) ).dir[q];
             }
         }
     }

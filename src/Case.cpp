@@ -66,9 +66,10 @@ int main(int argn, char **args){
     // Microscopic quantities
     Initialize::initDistfunc(fIn, U, RHO, Nx, Ny);
 
-/*************************************************************************************/
+/*************************************************************************************
+*   SIMULATION
+*************************************************************************************/
 
-/*************************************************************************************/
 
     for(size_t t_step = 0; t_step < Nt; ++t_step){
 
@@ -80,16 +81,17 @@ int main(int argn, char **args){
         Boundary::setMovingwall(fIn, U, RHO, uMax, Nx);
 
         /// COLLISION STEP
-        Processes::doCollision(fEq, fOut, U, RHO, omega, Nx, Ny);
+        Processes::doCollision(fOut, fIn, fEq, U, RHO, omega, Nx, Ny);
 
         /// SETTING BOUNDARIES
         // Set bounce back cells
-        Boundary::setBounceback(fIn, fOut, Nx, Ny);
+        Boundary::setBounceback(fOut, fIn, Nx, Ny);
 
         // STREAMING STEP
         Processes::doStreaming(fIn, fOut, Nx, Ny);
 
         if(t_step % plot_interval == 0){
+            std::cout << "Writing vtk file at t = " << t_step << std::endl;
             Utils::writeVtkOutput(U, Nx, Ny, t_step, 0, input.case_name, input.dict_name);
         }
     }
