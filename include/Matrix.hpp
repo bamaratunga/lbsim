@@ -13,6 +13,10 @@ template <typename T> class Matrix {
         _container = (T *)malloc(_imax * _jmax * sizeof(T));
     }
 
+    ~Matrix(){
+        free(_container);
+    }
+
     /// Element access and modify using index
     T &operator()(size_t i, size_t j) {
         return _container[j * _imax + i];
