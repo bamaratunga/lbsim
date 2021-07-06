@@ -1,32 +1,33 @@
 #include "Definitions.hpp"
 #include "Matrix.hpp"
 #include "Initialize.hpp"
+#include "cuda.h"
 
 namespace Initialize {
 
-void initMovingwall(Matrix<Vec>& U, double uMax, size_t Nx){
+__host__ void initMovingwall(Vec * U, double uMax, size_t Nx){
     /// Initialize Moving Wall
     for(size_t i = 0; i < Nx + 2; ++i){
-         U(i, 0).comp[0] = uMax;
+         U[i + 0 * (Nx + 2)].comp[0] = uMax;
     }
 }
 
 // MICROSCOPIC INITIAL CONDITION
 // TODO: use CS
-void initDistfunc(Matrix<Node>& fIn, Matrix<Vec>& U, Matrix<double>& RHO,
-                                                        size_t Nx, size_t Ny){
-    double c_u;
-    for (size_t i = 0; i < Nx + 2; ++i) {
-        for (size_t j = 0; j < Ny + 2; ++j) {
-            for (size_t q = 0; q < N_DIRECTIONS; ++q) {
-                c_u = 3 * (U(i,j).comp[0] * LATTICE_VELOCITIES[q][0]
-                        +  U(i,j).comp[1] * LATTICE_VELOCITIES[q][1]);
+__global__ void initDistfunc(Node * fIn, Vec * U, double RHO, size_t Nx, size_t Ny){
 
-                fIn(i,j).dir[q] = RHO(i, j) * LATTICE_WEIGHTS[q]
-                                   * ( 1 + c_u + 0.5 * (c_u * c_u)
-                                      - 1.5 * ( U(i,j).comp[0] * U(i,j).comp[0] + U(i,j).comp[1] * U(i,j).comp[1] ));
-            }
-        }
+    size_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    size_t j = blockIdx.y * blockDim.y + threadIdx.y;
+
+    double c_u;
+    for (size_t q = 0; q < N_DIRECTIONS; ++q) {
+        c_u = (U[i + j * (Nx + 2)].comp[0] * LATTICE_VELOCITIES[q][0]
+            +  U[i + j * (Nx + 2)].comp[1] * LATTICE_VELOCITIES[q][1]);
+
+        fIn[i + j * (Nx + 2)].dir[q] = RHO[i + j * (Nx + 2)] * LATTICE_WEIGHTS[q]
+                              * ( 1 + c_u / (CS * CS) + (c_u * c_u) / (2 * CS * CS * CS * CS)
+                              - ( U[i + j * (Nx + 2)].comp[0] * U[i + j * (Nx + 2)].comp[0]
+                              +   U[i + j * (Nx + 2)].comp[1] * U[i + j * (Nx + 2)].comp[1] ) / (2 * CS * CS));
     }
 }
 

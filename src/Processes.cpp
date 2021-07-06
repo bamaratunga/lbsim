@@ -1,17 +1,18 @@
 #include "Definitions.hpp"
 #include "Matrix.hpp"
 #include "Processes.hpp"
+#include "cuda.h"
 
 namespace Processes {
 
-void computeDensity(const Node * currentNode, double * density){
+__device__ void computeDensity(const Node * currentNode, double * density){
     *density = 0;
     for (int q = 0; q < N_DIRECTIONS; ++q) {
         *density += currentNode->dir[q];
     }
 }
 
-void computeVelocity(const Node * currentNode, Vec * velocity, double density) {
+__device__ void computeVelocity(const Node * currentNode, Vec * velocity, double density) {
 
     for (int d = 0; d < N_DIM; ++d) {
         // Initialize each velocity to zero
@@ -48,15 +49,13 @@ __device__ void computePostCollisionDistributions(Node * outputNode, Node * curr
     }
 }
 
-void calcQuantities(Matrix<Node>& fIn, Matrix<Vec>& U, Matrix<double>& RHO,
-                                                        size_t Nx, size_t Ny){
+__global__ void calcQuantities(Node * fIn, Vec * U, double * RHO, size_t Nx, size_t Ny){
+
+    size_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    size_t j = blockIdx.y * blockDim.y + threadIdx.y;
     /// CALCULATE MACROSCOPIC QUANTITIES FOR EACH CELL
-    for (size_t i = 0; i < Nx + 2; ++i) {
-        for (size_t j = 0; j < Ny + 2; ++j) {
-            computeDensity( &fIn(i, j), &RHO(i, j));
-            computeVelocity( &fIn(i, j), &U(i, j), RHO(i, j));
-        }
-    }
+    computeDensity( &fIn[i + j * (Nx + 2)], &RHO[i + j * (Nx + 2)]);
+    computeVelocity( &fIn[i + j * (Nx + 2)], &U[i + j * (Nx + 2)], RHO[i + j * (Nx + 2)]);
 }
 
 __global__ void doCollision(Node * fOut, Node * fIn, Node * fEq, Vec * U, double * RHO,
@@ -68,17 +67,17 @@ __global__ void doCollision(Node * fOut, Node * fIn, Node * fEq, Vec * U, double
     computePostCollisionDistributions( fOut[i + j * (Nx + 2)], fIn[i + j * (Nx + 2)], fEq[i + j * (Nx + 2)], omega );
 }
 
-void doStreaming(Matrix<Node>& fOut, Matrix<Node>& fIn, size_t Nx, size_t Ny){
+__global__ void doStreaming(Node * fOut, Node * fIn, size_t Nx, size_t Ny){
+
+    size_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    size_t j = blockIdx.y * blockDim.y + threadIdx.y;
 
     int Cx, Cy;
-    for (size_t j = 0; j < Ny + 2; ++j) {
-        for (size_t i = 0; i < Nx + 2; ++i) {
-            for (size_t q = 0; q < N_DIRECTIONS; ++q) {
-                Cx = LATTICE_VELOCITIES[q][0];
-                Cy = LATTICE_VELOCITIES[q][1];
-                fOut(i, j).dir[q] = fIn( (i - Cx + Nx + 2) % (Nx + 2), (j - Cy + Ny + 2) % (Ny + 2) ).dir[q];
-            }
-        }
+    for (size_t q = 0; q < N_DIRECTIONS; ++q) {
+        Cx = LATTICE_VELOCITIES[q][0];
+        Cy = LATTICE_VELOCITIES[q][1];
+        fOut[i + j * (Nx + 2)].dir[q]
+        = fIn[ (i - Cx + Nx + 2) % (Nx + 2) + ((j - Cy + Ny + 2) % (Ny + 2)) * (Nx + 2) ].dir[q];
     }
 }
 
