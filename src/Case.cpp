@@ -9,6 +9,15 @@
 #include "Boundary.hpp"
 #include "Processes.hpp"
 
+#define gpuErrChk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
+{
+  if (code != cudaSuccess)
+  {
+    fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+    if (abort) exit(code);
+  }
+}
 
 int main(int argn, char **args){
 
@@ -34,29 +43,34 @@ int main(int argn, char **args){
     double omega   = 2 / (6 * nu + 1);  // relaxation parameter
 
     /// Input distribution:
-    Matrix<Node> fIn  = Matrix<Node>(Nx + 2, Ny + 2);
+    Node * fIn;
+    gpuErrChk(cudaMallocManaged(&fIn, (Nx + 2) * (Ny + 2) * sizeof(Node)));
     /// Output distributions (post collision):
-    Matrix<Node> fOut = Matrix<Node>(Nx + 2, Ny + 2);
+    Node * fOut;
+    gpuErrChk(cudaMallocManaged(&fOut, (Nx + 2) * (Ny + 2) * sizeof(Node)));
     /// Equilibrium distribution:
-    Matrix<Node> fEq  = Matrix<Node>(Nx + 2, Ny + 2);
+    Node * fEq;
+    gpuErrChk(cudaMallocManaged(&fEq, (Nx + 2) * (Ny + 2) * sizeof(Node)));
 
     /// Macroscopic velocity vector
-    Matrix<Vec> U = Matrix<Vec>(Nx + 2, Ny + 2);
+    Vec * U;
+    gpuErrChk(cudaMallocManaged(&U, (Nx + 2) * (Ny + 2) * sizeof(Vec)));
     /// Density
-    Matrix<double> RHO = Matrix<double>(Nx + 2, Ny + 2);
+    double * RHO;
+    gpuErrChk(cudaMallocManaged(&RHO, (Nx + 2) * (Ny + 2) * sizeof(double)));
 
     /// Zero initialize all
     for (size_t i = 0; i < Nx + 2; ++i) {
         for (size_t j = 0; j < Ny + 2; ++j) {
             for(size_t q = 0; q < N_DIRECTIONS; ++q){
-                fIn(i, j).dir[q] = 0.0;
-                fOut(i, j).dir[q] = 0.0;
-                fEq(i, j).dir[q] = 0.0;
+                fIn[i + j * (Nx + 2)].dir[q] = 0.0;
+                fOut[i + j * (Nx + 2)].dir[q] = 0.0;
+                fEq[i + j * (Nx + 2)].dir[q] = 0.0;
             }
             for(size_t d = 0; d < N_DIM; ++d){
-                U(i, j).comp[d] = 0.0;
+                U[i + j * (Nx + 2)].comp[d] = 0.0;
             }
-            RHO(i, j) = 1.0;
+            RHO[i + j * (Nx + 2)] = 1.0;
         }
     }
 
@@ -69,7 +83,6 @@ int main(int argn, char **args){
 /*************************************************************************************
 *   SIMULATION
 *************************************************************************************/
-
 
     for(size_t t_step = 0; t_step < Nt; ++t_step){
 

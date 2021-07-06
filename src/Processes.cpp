@@ -24,7 +24,7 @@ void computeVelocity(const Node * currentNode, Vec * velocity, double density) {
     }
 }
 
-void computefEq(Node * eqField, const Vec * velocity, double density){
+__device__ void computefEq(Node * eqField, const Vec * velocity, double density){
 
 	for (int q = 0; q < N_DIRECTIONS; ++q) {
 
@@ -41,7 +41,7 @@ void computefEq(Node * eqField, const Vec * velocity, double density){
 	}
 }
 
-void computePostCollisionDistributions(Node * outputNode, Node * currentNode, const Node * eqField, double omega){
+__device__ void computePostCollisionDistributions(Node * outputNode, Node * currentNode, const Node * eqField, double omega){
 
     for (int q = 0; q < N_DIRECTIONS; ++q) {
         outputNode->dir[q] = currentNode->dir[q] - omega *( currentNode->dir[q] - eqField->dir[q] );
@@ -59,15 +59,13 @@ void calcQuantities(Matrix<Node>& fIn, Matrix<Vec>& U, Matrix<double>& RHO,
     }
 }
 
-void doCollision(Matrix<Node>& fOut, Matrix<Node>& fIn, Matrix<Node>& fEq, Matrix<Vec>& U, Matrix<double>& RHO,
-                                                           double omega, size_t Nx, size_t Ny) {
+__global__ void doCollision(Node * fOut, Node * fIn, Node * fEq, Vec * U, double * RHO,
+                                                            double omega, size_t Nx, size_t Ny) {
+    size_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    size_t j = blockIdx.y * blockDim.y + threadIdx.y;
     /// COLLISION STEP
-    for (size_t i = 0; i < Nx + 2; ++i) {
-        for (size_t j = 0; j < Ny + 2; ++j) {
-            computefEq( &fEq(i, j), &U(i, j), RHO(i, j) );
-            computePostCollisionDistributions( &fOut(i, j), &fIn(i, j), &fEq(i,j), omega );
-        }
-    }
+    computefEq( fEq[i + j * (Nx + 2)], U[i + j * (Nx + 2)], RHO[i + j * (Nx + 2)] );
+    computePostCollisionDistributions( fOut[i + j * (Nx + 2)], fIn[i + j * (Nx + 2)], fEq[i + j * (Nx + 2)], omega );
 }
 
 void doStreaming(Matrix<Node>& fOut, Matrix<Node>& fIn, size_t Nx, size_t Ny){
