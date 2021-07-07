@@ -254,21 +254,22 @@ __host__ void initMovingwall(Vec * U, double uMax, size_t Nx){
 }
 
 // MICROSCOPIC INITIAL CONDITION
-// TODO: use CS
 __global__ void initDistfunc(Node * fIn, Vec * U, double * RHO, size_t Nx, size_t Ny){
 
-    size_t i = blockIdx.x * blockDim.x + threadIdx.x;
-    size_t j = blockIdx.y * blockDim.y + threadIdx.y;
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
 
     double c_u;
+    double u_u;
     for (size_t q = 0; q < N_DIRECTIONS; ++q) {
         c_u = (U[i + j * (Nx + 2)].comp[0] * LATTICE_VELOCITIES[q][0]
             +  U[i + j * (Nx + 2)].comp[1] * LATTICE_VELOCITIES[q][1]);
+        u_u = (U[i + j * (Nx + 2)].comp[0] * U[i + j * (Nx + 2)].comp[0]
+             + U[i + j * (Nx + 2)].comp[1] * U[i + j * (Nx + 2)].comp[1]);
 
         fIn[i + j * (Nx + 2)].dir[q] = RHO[i + j * (Nx + 2)] * LATTICE_WEIGHTS[q]
-                              * ( 1 + c_u / (CS * CS) + (c_u * c_u) / (2 * CS * CS * CS * CS)
-                              - ( U[i + j * (Nx + 2)].comp[0] * U[i + j * (Nx + 2)].comp[0]
-                              +   U[i + j * (Nx + 2)].comp[1] * U[i + j * (Nx + 2)].comp[1] ) / (2 * CS * CS));
+                              * (1 + c_u / (CS * CS) + (c_u * c_u) / (2 * CS * CS * CS * CS)
+                              -  u_u / (2 * CS * CS));
     }
 }
 
@@ -291,8 +292,8 @@ namespace Boundary{
 // Moving wall
 __global__ void setMovingwall(Node * fIn, Vec * U, double * RHO, double uMax, size_t Nx){
 
-    size_t i = blockIdx.x * blockDim.x + threadIdx.x;
-    size_t j = blockIdx.y * blockDim.y + threadIdx.y;
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
 
     if(j == 0) {
         // Macroscopic Dirichlet boundary conditions
@@ -314,8 +315,8 @@ __global__ void setMovingwall(Node * fIn, Vec * U, double * RHO, double uMax, si
 // Set bounce back cells
 __global__ void setBounceback(Node * fOut, Node * fIn, size_t Nx, size_t Ny){
 
-    size_t i = blockIdx.x * blockDim.x + threadIdx.x;
-    size_t j = blockIdx.y * blockDim.y + threadIdx.y;
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
 
     if (j == Ny + 1) {
         for(size_t q = 0; q < N_DIRECTIONS; ++q){
@@ -323,13 +324,13 @@ __global__ void setBounceback(Node * fOut, Node * fIn, size_t Nx, size_t Ny){
         }
     }
 
-    if (i == 0) {
+    if ((i == 0) && (j > 0)) {
         for(size_t q = 0; q < N_DIRECTIONS; ++q){
             fOut[0 + j * (Nx + 2)].dir[q] = fIn[0 + j * (Nx + 2)].dir[OPP[q]];
         }
     }
 
-    if (i == Ny + 1) {
+    if ((i == Nx + 1) && (j > 0)) {
         for(size_t q = 0; q < N_DIRECTIONS; ++q){
             fOut[(Nx + 1) + j * (Nx + 2)].dir[q] = fIn[(Nx + 1) + j * (Nx + 2)].dir[OPP[q]];
         }
@@ -368,40 +369,38 @@ __device__ void computeVelocity(const Node * currentNode, Vec * velocity, double
         for (int q = 0; q < N_DIRECTIONS; ++q) {
            velocity->comp[d] += currentNode->dir[q] * LATTICE_VELOCITIES[q][d];
         }
-
         velocity->comp[d] = (density == 0) ? 0: velocity->comp[d] / density;
     }
 }
 
 __device__ void computefEq(Node * eqField, const Vec * velocity, double density){
 
-	for (int q = 0; q < N_DIRECTIONS; ++q) {
+	for (size_t q = 0; q < N_DIRECTIONS; ++q) {
 
         double c_dot_u = 0.0;
         double u_dot_u = 0.0;
-		for (int d = 0; d < N_DIM; ++d) {
+		for (size_t d = 0; d < N_DIM; ++d) {
             c_dot_u += LATTICE_VELOCITIES[q][d] * velocity->comp[d];
             u_dot_u += velocity->comp[d] * velocity->comp[d];
 		}
 
 		eqField->dir[q] =  LATTICE_WEIGHTS[q] * density * (1 + c_dot_u / (CS * CS)
-                    + (c_dot_u * c_dot_u)/(2 * CS * CS * CS * CS)
+                    + (c_dot_u * c_dot_u) / (2 * CS * CS * CS * CS)
                     - u_dot_u / (2 * CS * CS));
 	}
 }
 
 __device__ void computePostCollisionDistributions(Node * outputNode, Node * currentNode, const Node * eqField, double omega){
 
-    for (int q = 0; q < N_DIRECTIONS; ++q) {
+    for (size_t q = 0; q < N_DIRECTIONS; ++q) {
         outputNode->dir[q] = currentNode->dir[q] - omega *( currentNode->dir[q] - eqField->dir[q] );
     }
 }
 
 __global__ void calcQuantities(Node * fIn, Vec * U, double * RHO, size_t Nx, size_t Ny){
 
-    size_t i = blockIdx.x * blockDim.x + threadIdx.x;
-    size_t j = blockIdx.y * blockDim.y + threadIdx.y;
-
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
     /// CALCULATE MACROSCOPIC QUANTITIES FOR EACH CELL
     computeDensity( &fIn[i + j * (Nx + 2)], &RHO[i + j * (Nx + 2)]);
     computeVelocity( &fIn[i + j * (Nx + 2)], &U[i + j * (Nx + 2)], RHO[i + j * (Nx + 2)]);
@@ -409,9 +408,8 @@ __global__ void calcQuantities(Node * fIn, Vec * U, double * RHO, size_t Nx, siz
 
 __global__ void doCollision(Node * fOut, Node * fIn, Node * fEq, Vec * U, double * RHO,
                                                             double omega, size_t Nx, size_t Ny) {
-    size_t i = blockIdx.x * blockDim.x + threadIdx.x;
-    size_t j = blockIdx.y * blockDim.y + threadIdx.y;
-
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
     /// COLLISION STEP
     computefEq( &fEq[i + j * (Nx + 2)], &U[i + j * (Nx + 2)], RHO[i + j * (Nx + 2)] );
     computePostCollisionDistributions( &fOut[i + j * (Nx + 2)], &fIn[i + j * (Nx + 2)], &fEq[i + j * (Nx + 2)], omega );
@@ -419,9 +417,8 @@ __global__ void doCollision(Node * fOut, Node * fIn, Node * fEq, Vec * U, double
 
 __global__ void doStreaming(Node * fOut, Node * fIn, size_t Nx, size_t Ny){
 
-    size_t i = blockIdx.x * blockDim.x + threadIdx.x;
-    size_t j = blockIdx.y * blockDim.y + threadIdx.y;
-
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
     int Cx, Cy;
     for (size_t q = 0; q < N_DIRECTIONS; ++q) {
         Cx = LATTICE_VELOCITIES[q][0];
@@ -460,6 +457,7 @@ int main(int argn, char **args){
     /// DIMENSIONS
     size_t Nx      = input.x_dim;        // number of cells in x-direction
     size_t Ny      = input.y_dim;        // number of cells in y-direction
+    assert(Nx == Ny);
     size_t Nt      = input.timesteps;    // number of time steps
     size_t plot_interval = input.plot_interval;   // How many timesteps for the next plot update
 
@@ -501,8 +499,12 @@ int main(int argn, char **args){
         }
     }
 
-    dim3 gridSize(Nx / 32, Ny / 32);
-    dim3 blockSize( 32, 32);
+    size_t gSize_x = max(1, int((Nx + 2)/32));
+    size_t gSize_y = max(1, int((Ny + 2)/32));
+    size_t bSize_x = min(int(Nx + 2), 32);
+    size_t bSize_y = min(int(Ny + 2), 32);
+    dim3 gridSize(gSize_x, gSize_y);
+    dim3 blockSize(bSize_x, bSize_y);
     /// SET INITIAL CONDITIONS
     // Moving wall velocity
     Initialize::initMovingwall(U, uMax, Nx);
@@ -517,21 +519,19 @@ int main(int argn, char **args){
 
         /// CALCULATE MACROSCOPIC QUANTITIES FOR EACH CELL
         Processes::calcQuantities<<<gridSize, blockSize>>>(fIn, U, RHO, Nx, Ny);
-
         /// SETTING BOUNDARIES
         // Moving wall
         Boundary::setMovingwall<<<gridSize, blockSize>>>(fIn, U, RHO, uMax, Nx);
 
         /// COLLISION STEP
         Processes::doCollision<<<gridSize, blockSize>>>(fOut, fIn, fEq, U, RHO, omega, Nx, Ny);
-
         /// SETTING BOUNDARIES
         // Set bounce back cells
         Boundary::setBounceback<<<gridSize, blockSize>>>(fOut, fIn, Nx, Ny);
 
         // STREAMING STEP
         Processes::doStreaming<<<gridSize, blockSize>>>(fIn, fOut, Nx, Ny);
-        gpuErrChk(cudaDeviceSynchronize());
+
         if(t_step % plot_interval == 0){
             gpuErrChk(cudaDeviceSynchronize());
             std::cout << "Writing vtk file at t = " << t_step << std::endl;
