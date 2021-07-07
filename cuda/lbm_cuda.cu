@@ -6,8 +6,9 @@
 #include "cuda.h"
 
 #include <fstream>
-#include <filesystem>
 #include <algorithm>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #include <vtkCellData.h>
 #include <vtkDoubleArray.h>
@@ -110,42 +111,34 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
 namespace Utils{
 
 
-// void set_file_names(std::string file_name, std::string& case_name, std::string& dict_name) {
-//     std::string temp_dir;
-//     bool case_name_flag = true;
-//
-//     for (int i = file_name.size() - 1; i > -1; --i) {
-//         if (file_name[i] == '/') {
-//             case_name_flag = false;
-//         }
-//         if (case_name_flag) {
-//             case_name.push_back(file_name[i]);
-//         }
-//     }
-//
-//     for (int i = file_name.size() - case_name.size() - 1; i > -1; --i) {
-//         temp_dir.push_back(file_name[i]);
-//     }
-//
-//     std::reverse(case_name.begin(), case_name.end());
-//     std::reverse(temp_dir.begin(), temp_dir.end());
-//
-//     case_name.erase(case_name.size() - 4);
-//     dict_name = temp_dir;
-//     dict_name.append(case_name);
-//     dict_name.append("_Output");
-//
-//     // Create output directory
-//     filesystem::path folder(dict_name);
-//     try {
-//         filesystem::create_directory(folder);
-//     } catch (const std::exception &e) {
-//         std::cerr << "Output directory could not be created." << std::endl;
-//         std::cerr << "Make sure that you have write permissions to the "
-//                      "corresponding location"
-//                   << std::endl;
-//     }
-// }
+void set_file_names(std::string file_name, std::string& case_name, std::string& dict_name) {
+    std::string temp_dir;
+    bool case_name_flag = true;
+
+    for (int i = file_name.size() - 1; i > -1; --i) {
+        if (file_name[i] == '/') {
+            case_name_flag = false;
+        }
+        if (case_name_flag) {
+            case_name.push_back(file_name[i]);
+        }
+    }
+
+    for (int i = file_name.size() - case_name.size() - 1; i > -1; --i) {
+        temp_dir.push_back(file_name[i]);
+    }
+
+    std::reverse(case_name.begin(), case_name.end());
+    std::reverse(temp_dir.begin(), temp_dir.end());
+
+    case_name.erase(case_name.size() - 4);
+    dict_name = temp_dir;
+    dict_name.append(case_name);
+    dict_name.append("_CUDA_Output");
+
+    int status = mkdir(dict_name.c_str(), 0777);
+    if ((status < 0) && (errno != EEXIST)) {exit(EXIT_FAILURE);}
+}
 
 
 void read_inputs(std::string file_name, Inputs& input) {
@@ -172,7 +165,7 @@ void read_inputs(std::string file_name, Inputs& input) {
 
     file.close();
 
-    // set_file_names(file_name, input.case_name, input.dict_name);
+    set_file_names(file_name, input.case_name, input.dict_name);
 }
 
 
