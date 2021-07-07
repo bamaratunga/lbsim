@@ -169,67 +169,67 @@ void read_inputs(std::string file_name, Inputs& input) {
 }
 
 
-// void writeVtkOutput(Matrix<Vec>& U, size_t Nx, size_t Ny, size_t timestep, size_t my_rank, std::string case_name, std::string dict_name){
-//
-//    // Create a new structured grid
-//     vtkSmartPointer<vtkStructuredGrid> structuredGrid = vtkSmartPointer<vtkStructuredGrid>::New();
-//     // Create grid
-//     vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
-//
-//     double dx = 1.0 / Nx;
-//     double dy = 1.0 / Ny;
-//
-//     double x = 0;
-//     double y = 0;
-//
-//     { y += dy; }
-//     { x += dx; }
-//
-//     for (size_t col = 1; col < Ny + 1; col++) {
-//         x = 0;
-//         { x += dx; }
-//         for (size_t row = 1; row < Nx + 1; row++) {
-//             points->InsertNextPoint(x, y, 0);
-//             x += dx;
-//         }
-//         y += dy;
-//     }
-//
-//     // Specify the dimensions of the grid
-//     structuredGrid->SetDimensions(Nx, Ny, 1);
-//     structuredGrid->SetPoints(points);
-//
-//     // Velocity Array
-//     vtkDoubleArray *Velocity = vtkDoubleArray::New();
-//     Velocity->SetName("velocity");
-//     Velocity->SetNumberOfComponents(3);
-//
-//     // Temp Velocity
-//     float vel[3];
-//     vel[2] = 0; // Set z component to 0
-//
-//     // Print Velocity from bottom to top
-//     for (size_t j = Ny; j > 0; j--) {
-//         for (size_t i = 1; i < Nx + 1; i++) {
-//             vel[0] = U(i,j).comp[0];
-//             vel[1] = U(i,j).comp[1];
-//             Velocity->InsertNextTuple(vel);
-//         }
-//     }
-//
-//     // Add Velocity to Structured Grid
-//     structuredGrid->GetPointData()->AddArray(Velocity);
-//
-//     // Write Grid
-//     vtkSmartPointer<vtkStructuredGridWriter> writer = vtkSmartPointer<vtkStructuredGridWriter>::New();
-//
-//     // Create Filename
-//     std::string outputname =
-//     dict_name + '/' + case_name + "_" + std::to_string(my_rank) + "." + std::to_string(timestep) + ".vtk";
-//     writer->SetFileName(outputname.c_str());
-//     writer->SetInputData(structuredGrid);
-//     writer->Write();
-// }
+void writeVtkOutput(Vec * U, size_t Nx, size_t Ny, size_t timestep, size_t my_rank, std::string case_name, std::string dict_name){
+
+   // Create a new structured grid
+    vtkSmartPointer<vtkStructuredGrid> structuredGrid = vtkSmartPointer<vtkStructuredGrid>::New();
+    // Create grid
+    vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
+
+    double dx = 1.0 / Nx;
+    double dy = 1.0 / Ny;
+
+    double x = 0;
+    double y = 0;
+
+    { y += dy; }
+    { x += dx; }
+
+    for (size_t col = 1; col < Ny + 1; col++) {
+        x = 0;
+        { x += dx; }
+        for (size_t row = 1; row < Nx + 1; row++) {
+            points->InsertNextPoint(x, y, 0);
+            x += dx;
+        }
+        y += dy;
+    }
+
+    // Specify the dimensions of the grid
+    structuredGrid->SetDimensions(Nx, Ny, 1);
+    structuredGrid->SetPoints(points);
+
+    // Velocity Array
+    vtkDoubleArray *Velocity = vtkDoubleArray::New();
+    Velocity->SetName("velocity");
+    Velocity->SetNumberOfComponents(3);
+
+    // Temp Velocity
+    float vel[3];
+    vel[2] = 0; // Set z component to 0
+
+    // Print Velocity from bottom to top
+    for (size_t j = Ny; j > 0; j--) {
+        for (size_t i = 1; i < Nx + 1; i++) {
+            vel[0] = U[i + j * Nx].comp[0];
+            vel[1] = U[i + j * Nx].comp[1];
+            Velocity->InsertNextTuple(vel);
+        }
+    }
+
+    // Add Velocity to Structured Grid
+    structuredGrid->GetPointData()->AddArray(Velocity);
+
+    // Write Grid
+    vtkSmartPointer<vtkStructuredGridWriter> writer = vtkSmartPointer<vtkStructuredGridWriter>::New();
+
+    // Create Filename
+    std::string outputname =
+    dict_name + '/' + case_name + "_" + std::to_string(my_rank) + "." + std::to_string(timestep) + ".vtk";
+    writer->SetFileName(outputname.c_str());
+    writer->SetInputData(structuredGrid);
+    writer->Write();
+}
 
 } // namespace Utils
 
@@ -248,8 +248,8 @@ namespace Initialize {
 
 __host__ void initMovingwall(Vec * U, double uMax, size_t Nx){
     /// Initialize Moving Wall
-    for(size_t i = 0; i < Nx + 2; ++i){
-         U[i + 0 * (Nx + 2)].comp[0] = uMax;
+    for(size_t k = 0; k < Nx + 2; ++k){
+         U[k + 0 * (Nx + 2)].comp[0] = uMax;
     }
 }
 
@@ -469,44 +469,34 @@ int main(int argn, char **args){
 
     /// Input distribution:
     Node * fIn;
-    gpuErrChk(cudaMallocManaged(&fIn, (Nx + 2) * (Ny + 2) * sizeof(Node)));
+    gpuErrChk(cudaMalloc(&fIn, (Nx + 2) * (Ny + 2) * sizeof(Node)));
     /// Output distributions (post collision):
     Node * fOut;
-    gpuErrChk(cudaMallocManaged(&fOut, (Nx + 2) * (Ny + 2) * sizeof(Node)));
+    gpuErrChk(cudaMalloc(&fOut, (Nx + 2) * (Ny + 2) * sizeof(Node)));
     /// Equilibrium distribution:
     Node * fEq;
-    gpuErrChk(cudaMallocManaged(&fEq, (Nx + 2) * (Ny + 2) * sizeof(Node)));
+    gpuErrChk(cudaMalloc(&fEq, (Nx + 2) * (Ny + 2) * sizeof(Node)));
 
     /// Macroscopic velocity vector
     Vec * U;
-    gpuErrChk(cudaMallocManaged(&U, (Nx + 2) * (Ny + 2) * sizeof(Vec)));
+    gpuErrChk(cudaMalloc(&U, (Nx + 2) * (Ny + 2) * sizeof(Vec)));
     /// Density
     double * RHO;
-    gpuErrChk(cudaMallocManaged(&RHO, (Nx + 2) * (Ny + 2) * sizeof(double)));
+    gpuErrChk(cudaMalloc(&RHO, (Nx + 2) * (Ny + 2) * sizeof(double)));
+    // Host side memeory for U
+    Vec * Uin;
+    Uin = (Vec *)malloc((Nx + 2) * (Ny + 2) * sizeof(Vec));
 
-    /// Zero initialize all
-    for (size_t i = 0; i < Nx + 2; ++i) {
-        for (size_t j = 0; j < Ny + 2; ++j) {
-            for(size_t q = 0; q < N_DIRECTIONS; ++q){
-                fIn[i + j * (Nx + 2)].dir[q] = 0.0;
-                fOut[i + j * (Nx + 2)].dir[q] = 0.0;
-                fEq[i + j * (Nx + 2)].dir[q] = 0.0;
-            }
-            for(size_t d = 0; d < N_DIM; ++d){
-                U[i + j * (Nx + 2)].comp[d] = 0.0;
-            }
-            RHO[i + j * (Nx + 2)] = 1.0;
-        }
-    }
-
+    // TODO: Initialize all cuda memory to zero
 
     dim3 gridSize(Nx / 32, Ny / 32);
     dim3 blockSize( 32, 32);
-
     /// SET INITIAL CONDITIONS
     // Moving wall velocity
-    Initialize::initMovingwall(U, uMax, Nx);
-    // Microscopic quantities
+    Initialize::initMovingwall(Uin, uMax, Nx);
+    // Copy input data to device
+    gpuErrChk(cudaMemcpy(U, Uin, (Nx + 2) * (Ny + 2) * sizeof(Vec), cudaMemcpyHostToDevice));
+    // Initialize Microscopic quantities
     Initialize::initDistfunc<<<gridSize, blockSize>>>(fIn, U, RHO, Nx, Ny);
 
 /*************************************************************************************
@@ -533,8 +523,9 @@ int main(int argn, char **args){
         Processes::doStreaming<<<gridSize, blockSize>>>(fIn, fOut, Nx, Ny);
 
         if(t_step % plot_interval == 0){
-            std::cout << "Writing vtk file at t = " << t_step << std::endl;
-            // Utils::writeVtkOutput(U, Nx, Ny, t_step, 0, input.case_name, input.dict_name);
+            // TODO: Print message
+            gpuErrChk(cudaMemcpy(Uin, U, (Nx + 2) * (Ny + 2) * sizeof(Vec), cudaMemcpyDeviceToHost));
+            Utils::writeVtkOutput(Uin, Nx, Ny, t_step, 0, input.case_name, input.dict_name);
         }
     }
 }
