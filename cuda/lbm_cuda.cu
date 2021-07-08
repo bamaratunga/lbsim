@@ -51,7 +51,7 @@ __constant__ double LATTICE_WEIGHTS[N_DIRECTIONS] = {4.0/9.0,
                                                      1.0/36.0};
 // TODO
 // __constant__ double CS = 1.0/sqrt(3.0);
-__constant__ double CS = 0.57735;
+__constant__ double CS = 0.577350269;
 
 typedef struct Node {
     double dir[N_DIRECTIONS];
@@ -354,14 +354,14 @@ __global__ void setBounceback(Node * fOut, Node * fIn, size_t Nx, size_t Ny){
 
 namespace Processes {
 
-__device__ void computeDensity(const Node * currentNode, double * density){
+__device__ void computeDensity(Node * currentNode, double * density){
     *density = 0;
     for (int q = 0; q < N_DIRECTIONS; ++q) {
         *density += currentNode->dir[q];
     }
 }
 
-__device__ void computeVelocity(const Node * currentNode, Vec * velocity, double density) {
+__device__ void computeVelocity(Node * currentNode, Vec * velocity, double density) {
 
     for (int d = 0; d < N_DIM; ++d) {
         // Initialize each velocity to zero
@@ -390,7 +390,7 @@ __device__ void computefEq(Node * eqField, const Vec * velocity, double density)
 	}
 }
 
-__device__ void computePostCollisionDistributions(Node * outputNode, Node * currentNode, const Node * eqField, double omega){
+__device__ void computePostCollisionDistributions(Node * outputNode, Node * currentNode, Node * eqField, double omega){
 
     for (size_t q = 0; q < N_DIRECTIONS; ++q) {
         outputNode->dir[q] = currentNode->dir[q] - omega *( currentNode->dir[q] - eqField->dir[q] );
@@ -424,7 +424,7 @@ __global__ void doStreaming(Node * fOut, Node * fIn, size_t Nx, size_t Ny){
         Cx = LATTICE_VELOCITIES[q][0];
         Cy = LATTICE_VELOCITIES[q][1];
         fOut[i + j * (Nx + 2)].dir[q]
-        = fIn[ (i - Cx + Nx + 2) % (Nx + 2) + ((j - Cy + Ny + 2) % (Ny + 2)) * (Nx + 2) ].dir[q];
+        = fIn[ (i - Cx + Nx + 2) % (Nx + 2) + ((j + Cy + Ny + 2) % (Ny + 2)) * (Nx + 2) ].dir[q];
     }
 }
 
@@ -464,7 +464,7 @@ int main(int argn, char **args){
     /// FLOW PARAMETERS
     double Re      = input.reynolds;    // Reynolds number (Main flow parameter)
     double uMax    = input.wall_vel;    // Velocity of lid
-    double nu      = uMax * Nx / Re;    // kinematic viscosity (is chosen such that the given Raynolds number is achieved)
+    double nu      = uMax * (Nx + 2) / Re; // kinematic viscosity (is chosen such that the given Raynolds number is achieved)
     double omega   = 2 / (6 * nu + 1);  // relaxation parameter
 
     /// Input distribution:
@@ -503,8 +503,8 @@ int main(int argn, char **args){
     size_t gSize_y = max(1, int((Ny + 2)/32));
     size_t bSize_x = min(int(Nx + 2), 32);
     size_t bSize_y = min(int(Ny + 2), 32);
-    dim3 gridSize(gSize_x, gSize_y);
-    dim3 blockSize(bSize_x, bSize_y);
+    dim3 gridSize(1, 1);
+    dim3 blockSize(32, 32);
     /// SET INITIAL CONDITIONS
     // Moving wall velocity
     Initialize::initMovingwall(U, uMax, Nx);
@@ -531,6 +531,7 @@ int main(int argn, char **args){
 
         // STREAMING STEP
         Processes::doStreaming<<<gridSize, blockSize>>>(fIn, fOut, Nx, Ny);
+
 
         if(t_step % plot_interval == 0){
             gpuErrChk(cudaDeviceSynchronize());
