@@ -246,7 +246,21 @@ void writeVtkOutput(Vec * U, size_t Nx, size_t Ny, size_t timestep, size_t my_ra
 
 namespace Initialize {
 
-__host__ void initMovingwall(Vec * U, double uMax, size_t Nx){
+__global__ void initMovingwall(Node * fIn, Node * fOut, Node * fEq, Vec * U, double * RHO, double uMax, size_t Nx, size_t Ny){
+    /// Zero initialize all data
+    for(size_t l = 0; l < Ny + 2; l++){
+        for(size_t k = 0; k < Nx + 2; k++){
+            for(size_t d = 0; d < N_DIM; d++){
+                U[k + l * (Nx + 2)].comp[d] = 0.0;
+            }
+            for(size_t q = 0; q < N_DIRECTIONS; q++){
+                fIn[k + l * (Nx + 2)].dir[q] = 0.0;
+                fOut[k + l * (Nx + 2)].dir[q] = 0.0;
+                fEq[k + l * (Nx + 2)].dir[q] = 0.0;
+            }
+            RHO[k + l * (Nx + 2)] = 1.0;
+        }
+    }
     /// Initialize Moving Wall
     for(size_t k = 0; k < Nx + 2; ++k){
          U[k + 0 * (Nx + 2)].comp[0] = uMax;
@@ -468,46 +482,37 @@ int main(int argn, char **args){
     double omega   = 2 / (6 * nu + 1);  // relaxation parameter
 
     /// Input distribution:
-    Node * fIn;
-    gpuErrChk(cudaMallocManaged(&fIn, (Nx + 2) * (Ny + 2) * sizeof(Node)));
+    Node * fIn = NULL;
+    gpuErrChk(cudaMalloc((void**)&fIn, (Nx + 2) * (Ny + 2) * sizeof(Node)));
+
     /// Output distributions (post collision):
-    Node * fOut;
-    gpuErrChk(cudaMallocManaged(&fOut, (Nx + 2) * (Ny + 2) * sizeof(Node)));
+    Node * fOut = NULL;
+    gpuErrChk(cudaMalloc((void**)&fOut, (Nx + 2) * (Ny + 2) * sizeof(Node)));
     /// Equilibrium distribution:
-    Node * fEq;
-    gpuErrChk(cudaMallocManaged(&fEq, (Nx + 2) * (Ny + 2) * sizeof(Node)));
+    Node * fEq = NULL;
+    gpuErrChk(cudaMalloc((void**)&fEq, (Nx + 2) * (Ny + 2) * sizeof(Node)));
 
     /// Macroscopic velocity vector
-    Vec * U;
-    gpuErrChk(cudaMallocManaged(&U, (Nx + 2) * (Ny + 2) * sizeof(Vec)));
+    Vec * U = NULL;
+    gpuErrChk(cudaMalloc((void**)&U, (Nx + 2) * (Ny + 2) * sizeof(Vec)));
     /// Density
-    double * RHO;
-    gpuErrChk(cudaMallocManaged(&RHO, (Nx + 2) * (Ny + 2) * sizeof(double)));
+    double * RHO = NULL;
+    gpuErrChk(cudaMalloc(&RHO, (Nx + 2) * (Ny + 2) * sizeof(double)));
 
-    /// Zero initialize all
-    for (size_t i = 0; i < Nx + 2; ++i) {
-        for (size_t j = 0; j < Ny + 2; ++j) {
-            for(size_t q = 0; q < N_DIRECTIONS; ++q){
-                fIn[i + j * (Nx + 2)].dir[q] = 0.0;
-                fOut[i + j * (Nx + 2)].dir[q] = 0.0;
-                fEq[i + j * (Nx + 2)].dir[q] = 0.0;
-            }
-            for(size_t d = 0; d < N_DIM; ++d){
-                U[i + j * (Nx + 2)].comp[d] = 0.0;
-            }
-            RHO[i + j * (Nx + 2)] = 1.0;
-        }
-    }
+    Vec * Uin = NULL;
+    Uin = (Vec *)malloc((Nx + 2) * (Ny + 2) * sizeof(Vec));
 
-    size_t gSize_x = max(1, int((Nx + 2)/32));
-    size_t gSize_y = max(1, int((Ny + 2)/32));
-    size_t bSize_x = min(int(Nx + 2), 32);
-    size_t bSize_y = min(int(Ny + 2), 32);
+    // size_t gSize_x = max(1, int((Nx + 2)/32));
+    // size_t gSize_y = max(1, int((Ny + 2)/32));
+    // size_t bSize_x = min(int(Nx + 2), 32);
+    // size_t bSize_y = min(int(Ny + 2), 32);
     dim3 gridSize(1, 1);
-    dim3 blockSize(32, 32);
+    dim3 blockSize(32,32);
     /// SET INITIAL CONDITIONS
     // Moving wall velocity
-    Initialize::initMovingwall(U, uMax, Nx);
+    Initialize::initMovingwall<<<gridSize, blockSize>>>(fIn, fOut, fEq, U, RHO, uMax, Nx, Ny);
+    // Copy initialized data to device
+    gpuErrChk(cudaMemcpy(U, Uin, (Nx + 2) * (Ny + 2) * sizeof(Vec), cudaMemcpyHostToDevice));
     // Initialize Microscopic quantities
     Initialize::initDistfunc<<<gridSize, blockSize>>>(fIn, U, RHO, Nx, Ny);
 
@@ -532,11 +537,18 @@ int main(int argn, char **args){
         // STREAMING STEP
         Processes::doStreaming<<<gridSize, blockSize>>>(fIn, fOut, Nx, Ny);
 
-
         if(t_step % plot_interval == 0){
             gpuErrChk(cudaDeviceSynchronize());
             std::cout << "Writing vtk file at t = " << t_step << std::endl;
-            Utils::writeVtkOutput(U, Nx, Ny, t_step, 0, input.case_name, input.dict_name);
+            gpuErrChk(cudaMemcpy(Uin, U, (Nx + 2) * (Ny + 2) * sizeof(Vec), cudaMemcpyDeviceToHost));
+            // // Utils::writeVtkOutput(Uin, Nx, Ny, t_step, 0, input.case_name, input.dict_name);
+            for(size_t l = 0; l < Nx + 2; l++){
+                for(size_t k = 0; k < Ny + 2; k++){
+                    printf("%lf ", Uin[l + (Ny + 2) * k].comp[0]);
+                }
+                printf("\n\n" );
+            }
+            printf("\n\n\n");
         }
     }
 }
