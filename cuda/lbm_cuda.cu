@@ -3,6 +3,7 @@
 #include <iostream>
 #include <cstdlib>
 #include <cmath>
+#include <cassert>
 #include "cuda.h"
 
 #include <fstream>
@@ -383,7 +384,7 @@ __device__ void computeVelocity(Node * currentNode, Vec * velocity, double densi
         for (int q = 0; q < N_DIRECTIONS; ++q) {
            velocity->comp[d] += currentNode->dir[q] * LATTICE_VELOCITIES[q][d];
         }
-        velocity->comp[d] = (density == 0) ? 0: velocity->comp[d] / density;
+        velocity->comp[d] = (fabs(density) < 1e-5) ? 0: velocity->comp[d] / density;
     }
 }
 
@@ -507,14 +508,17 @@ int main(int argn, char **args){
     // size_t bSize_x = min(int(Nx + 2), 32);
     // size_t bSize_y = min(int(Ny + 2), 32);
     dim3 gridSize(1, 1);
-    dim3 blockSize(32,32);
+    dim3 blockSize(16,16);
     /// SET INITIAL CONDITIONS
     // Moving wall velocity
     Initialize::initMovingwall<<<gridSize, blockSize>>>(fIn, fOut, fEq, U, RHO, uMax, Nx, Ny);
+    gpuErrChk(cudaDeviceSynchronize());
     // Copy initialized data to device
     gpuErrChk(cudaMemcpy(U, Uin, (Nx + 2) * (Ny + 2) * sizeof(Vec), cudaMemcpyHostToDevice));
+    gpuErrChk(cudaDeviceSynchronize());
     // Initialize Microscopic quantities
     Initialize::initDistfunc<<<gridSize, blockSize>>>(fIn, U, RHO, Nx, Ny);
+    gpuErrChk(cudaDeviceSynchronize());
 
 /*************************************************************************************
 *   SIMULATION
@@ -524,31 +528,29 @@ int main(int argn, char **args){
 
         /// CALCULATE MACROSCOPIC QUANTITIES FOR EACH CELL
         Processes::calcQuantities<<<gridSize, blockSize>>>(fIn, U, RHO, Nx, Ny);
+        gpuErrChk(cudaDeviceSynchronize());
         /// SETTING BOUNDARIES
         // Moving wall
         Boundary::setMovingwall<<<gridSize, blockSize>>>(fIn, U, RHO, uMax, Nx);
+        gpuErrChk(cudaDeviceSynchronize());
 
         /// COLLISION STEP
         Processes::doCollision<<<gridSize, blockSize>>>(fOut, fIn, fEq, U, RHO, omega, Nx, Ny);
+        gpuErrChk(cudaDeviceSynchronize());
         /// SETTING BOUNDARIES
         // Set bounce back cells
         Boundary::setBounceback<<<gridSize, blockSize>>>(fOut, fIn, Nx, Ny);
+        gpuErrChk(cudaDeviceSynchronize());
 
         // STREAMING STEP
         Processes::doStreaming<<<gridSize, blockSize>>>(fIn, fOut, Nx, Ny);
+        gpuErrChk(cudaDeviceSynchronize());
 
         if(t_step % plot_interval == 0){
-            gpuErrChk(cudaDeviceSynchronize());
             std::cout << "Writing vtk file at t = " << t_step << std::endl;
             gpuErrChk(cudaMemcpy(Uin, U, (Nx + 2) * (Ny + 2) * sizeof(Vec), cudaMemcpyDeviceToHost));
-            // // Utils::writeVtkOutput(Uin, Nx, Ny, t_step, 0, input.case_name, input.dict_name);
-            for(size_t l = 0; l < Nx + 2; l++){
-                for(size_t k = 0; k < Ny + 2; k++){
-                    printf("%lf ", Uin[l + (Ny + 2) * k].comp[0]);
-                }
-                printf("\n\n" );
-            }
-            printf("\n\n\n");
+            gpuErrChk(cudaDeviceSynchronize());
+            Utils::writeVtkOutput(Uin, Nx, Ny, t_step, 0, input.case_name, input.dict_name);
         }
     }
 }
