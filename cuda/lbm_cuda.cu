@@ -482,7 +482,6 @@ int main(int argn, char **args){
     /// Input distribution:
     Node * fIn = NULL;
     gpuErrChk(cudaMalloc(&fIn, (Nx + 2) * (Ny + 2) * sizeof(Node)));
-
     /// Output distributions (post collision):
     Node * fOut = NULL;
     gpuErrChk(cudaMalloc(&fOut, (Nx + 2) * (Ny + 2) * sizeof(Node)));

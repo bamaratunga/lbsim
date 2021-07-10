@@ -53,6 +53,7 @@ add_executable(lbsim lbm_cuda.cu)
 ##******** Compiler options
 ##******** Turn on warnings
 # target_compile_options(lbsim PRIVATE -Wall -Wextra)
+target_compile_options(lbsim PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-ftz=false -prec-div=true -prec-sqrt=true>) 
 target_compile_features(lbsim PUBLIC cxx_std_11)
 
 ##******** if you use external libraries you have to link them like
