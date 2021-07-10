@@ -41,18 +41,15 @@ __constant__ int LATTICE_VELOCITIES[N_DIRECTIONS][N_DIM] =  {{ 0, 0},
                                                              {-1, 1},
                                                              {-1,-1},
                                                              { 1,-1}};
-__constant__ double LATTICE_WEIGHTS[N_DIRECTIONS] = {4.0/9.0,
-                                                     1.0/9.0,
-                                                     1.0/9.0,
-                                                     1.0/9.0,
-                                                     1.0/9.0,
-                                                     1.0/36.0,
-                                                     1.0/36.0,
-                                                     1.0/36.0,
-                                                     1.0/36.0};
-// TODO
-// __constant__ double CS = 1.0/sqrt(3.0);
-__constant__ double CS = 0.577350269;
+__constant__ double LATTICE_WEIGHTS[N_DIRECTIONS][2] = {{4.0, 9.0},
+                                                        {1.0, 9.0},
+                                                        {1.0, 9.0},
+                                                        {1.0, 9.0},
+                                                        {1.0, 9.0},
+                                                        {1.0, 36.0},
+                                                        {1.0, 36.0},
+                                                        {1.0, 36.0},
+                                                        {1.0, 36.0}};
 
 typedef struct Node {
     double dir[N_DIRECTIONS];
@@ -282,9 +279,9 @@ __global__ void initDistfunc(Node * fIn, Vec * U, double * RHO, size_t Nx, size_
         u_u = (U[i + j * (Nx + 2)].comp[0] * U[i + j * (Nx + 2)].comp[0]
              + U[i + j * (Nx + 2)].comp[1] * U[i + j * (Nx + 2)].comp[1]);
 
-        fIn[i + j * (Nx + 2)].dir[q] = RHO[i + j * (Nx + 2)] * LATTICE_WEIGHTS[q]
-                              * (1 + c_u / (CS * CS) + (c_u * c_u) / (2 * CS * CS * CS * CS)
-                              -  u_u / (2 * CS * CS));
+        double weight = __ddiv_rn(LATTICE_WEIGHTS[q][0], LATTICE_WEIGHTS[q][1]);
+        fIn[i + j * (Nx + 2)].dir[q] = RHO[i + j * (Nx + 2)] * weight
+                              * ( 1 + 3 * c_u + 4.5 * c_u * c_u - 1.5 * u_u );
     }
 }
 
@@ -372,7 +369,7 @@ namespace Processes {
 __device__ void computeDensity(Node * currentNode, double * density){
     *density = 0;
     for (int q = 0; q < N_DIRECTIONS; ++q) {
-        *density += currentNode->dir[q];
+        *density = __dadd_rn(*density, currentNode->dir[q]);
     }
 }
 
@@ -382,9 +379,9 @@ __device__ void computeVelocity(Node * currentNode, Vec * velocity, double densi
         // Initialize each velocity to zero
         velocity->comp[d] = 0.0;
         for (int q = 0; q < N_DIRECTIONS; ++q) {
-           velocity->comp[d] += currentNode->dir[q] * LATTICE_VELOCITIES[q][d];
+            velocity->comp[d] = __dadd_rn(velocity->comp[d], currentNode->dir[q] * LATTICE_VELOCITIES[q][d]);
         }
-        velocity->comp[d] = (fabs(density) < 1e-5) ? 0: velocity->comp[d] / density;
+        velocity->comp[d] = (fabs(density) < 0.01) ? 0: __ddiv_rn(velocity->comp[d], density);
     }
 }
 
@@ -395,20 +392,23 @@ __device__ void computefEq(Node * eqField, const Vec * velocity, double density)
         double c_dot_u = 0.0;
         double u_dot_u = 0.0;
 		for (size_t d = 0; d < N_DIM; ++d) {
-            c_dot_u += LATTICE_VELOCITIES[q][d] * velocity->comp[d];
-            u_dot_u += velocity->comp[d] * velocity->comp[d];
+            c_dot_u = __dadd_rn(c_dot_u, __dmul_rn(LATTICE_VELOCITIES[q][d], velocity->comp[d]));
+            u_dot_u = __dadd_rn(u_dot_u, __dmul_rn(velocity->comp[d], velocity->comp[d]));
 		}
-
-		eqField->dir[q] =  LATTICE_WEIGHTS[q] * density * (1 + c_dot_u / (CS * CS)
-                    + (c_dot_u * c_dot_u) / (2 * CS * CS * CS * CS)
-                    - u_dot_u / (2 * CS * CS));
+        double c_dot_u_2 = __dmul_rn(c_dot_u, c_dot_u);
+        double weight = __ddiv_rn(LATTICE_WEIGHTS[q][0], LATTICE_WEIGHTS[q][1]);
+        double weight_density = __dmul_rn(weight, density);
+		eqField->dir[q] = __dmul_rn(weight_density, (1 + 3.0 * c_dot_u + 4.5 * c_dot_u_2 - 1.5 * u_dot_u));
 	}
 }
 
 __device__ void computePostCollisionDistributions(Node * outputNode, Node * currentNode, Node * eqField, double omega){
 
     for (size_t q = 0; q < N_DIRECTIONS; ++q) {
-        outputNode->dir[q] = currentNode->dir[q] - omega *( currentNode->dir[q] - eqField->dir[q] );
+        // Accuracy hotspot
+        outputNode->dir[q] = currentNode->dir[q] - omega * (currentNode->dir[q] - eqField->dir[q]);
+        // outputNode->dir[q] = (1 - omega) * currentNode->dir[q] + omega * eqField->dir[q];
+        // outputNode->dir[q] = __dmul_rn((1 - omega), currentNode->dir[q]) + __dmul_rn(omega, eqField->dir[q]);
     }
 }
 
@@ -484,18 +484,18 @@ int main(int argn, char **args){
 
     /// Input distribution:
     Node * fIn = NULL;
-    gpuErrChk(cudaMalloc((void**)&fIn, (Nx + 2) * (Ny + 2) * sizeof(Node)));
+    gpuErrChk(cudaMalloc(&fIn, (Nx + 2) * (Ny + 2) * sizeof(Node)));
 
     /// Output distributions (post collision):
     Node * fOut = NULL;
-    gpuErrChk(cudaMalloc((void**)&fOut, (Nx + 2) * (Ny + 2) * sizeof(Node)));
+    gpuErrChk(cudaMalloc(&fOut, (Nx + 2) * (Ny + 2) * sizeof(Node)));
     /// Equilibrium distribution:
     Node * fEq = NULL;
-    gpuErrChk(cudaMalloc((void**)&fEq, (Nx + 2) * (Ny + 2) * sizeof(Node)));
+    gpuErrChk(cudaMalloc(&fEq, (Nx + 2) * (Ny + 2) * sizeof(Node)));
 
     /// Macroscopic velocity vector
     Vec * U = NULL;
-    gpuErrChk(cudaMalloc((void**)&U, (Nx + 2) * (Ny + 2) * sizeof(Vec)));
+    gpuErrChk(cudaMalloc(&U, (Nx + 2) * (Ny + 2) * sizeof(Vec)));
     /// Density
     double * RHO = NULL;
     gpuErrChk(cudaMalloc(&RHO, (Nx + 2) * (Ny + 2) * sizeof(double)));
@@ -508,13 +508,10 @@ int main(int argn, char **args){
     // size_t bSize_x = min(int(Nx + 2), 32);
     // size_t bSize_y = min(int(Ny + 2), 32);
     dim3 gridSize(1, 1);
-    dim3 blockSize(16,16);
+    dim3 blockSize(8,8);
     /// SET INITIAL CONDITIONS
-    // Moving wall velocity
+    // Moving wall velocity and zero initialize other memory locations
     Initialize::initMovingwall<<<gridSize, blockSize>>>(fIn, fOut, fEq, U, RHO, uMax, Nx, Ny);
-    gpuErrChk(cudaDeviceSynchronize());
-    // Copy initialized data to device
-    gpuErrChk(cudaMemcpy(U, Uin, (Nx + 2) * (Ny + 2) * sizeof(Vec), cudaMemcpyHostToDevice));
     gpuErrChk(cudaDeviceSynchronize());
     // Initialize Microscopic quantities
     Initialize::initDistfunc<<<gridSize, blockSize>>>(fIn, U, RHO, Nx, Ny);
@@ -529,20 +526,20 @@ int main(int argn, char **args){
         /// CALCULATE MACROSCOPIC QUANTITIES FOR EACH CELL
         Processes::calcQuantities<<<gridSize, blockSize>>>(fIn, U, RHO, Nx, Ny);
         gpuErrChk(cudaDeviceSynchronize());
-        /// SETTING BOUNDARIES
-        // Moving wall
+
+        /// SETTING BOUNDARIES - Set Moving wall
         Boundary::setMovingwall<<<gridSize, blockSize>>>(fIn, U, RHO, uMax, Nx);
         gpuErrChk(cudaDeviceSynchronize());
 
         /// COLLISION STEP
         Processes::doCollision<<<gridSize, blockSize>>>(fOut, fIn, fEq, U, RHO, omega, Nx, Ny);
         gpuErrChk(cudaDeviceSynchronize());
-        /// SETTING BOUNDARIES
-        // Set bounce back cells
+
+        /// SETTING BOUNDARIES - Set bounce back cells
         Boundary::setBounceback<<<gridSize, blockSize>>>(fOut, fIn, Nx, Ny);
         gpuErrChk(cudaDeviceSynchronize());
 
-        // STREAMING STEP
+        /// STREAMING STEP
         Processes::doStreaming<<<gridSize, blockSize>>>(fIn, fOut, Nx, Ny);
         gpuErrChk(cudaDeviceSynchronize());
 
