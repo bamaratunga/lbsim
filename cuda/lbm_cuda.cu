@@ -180,13 +180,9 @@ void writeVtkOutput(Vec * U, size_t Nx, size_t Ny, size_t timestep, size_t my_ra
     double x = 0;
     double y = 0;
 
-    { y += dy; }
-    { x += dx; }
-
-    for (size_t col = 1; col < Ny + 1; col++) {
+    for (size_t col = 0; col < Ny; col++) {
         x = 0;
-        { x += dx; }
-        for (size_t row = 1; row < Nx + 1; row++) {
+        for (size_t row = 0; row < Nx; row++) {
             points->InsertNextPoint(x, y, 0);
             x += dx;
         }
@@ -207,8 +203,8 @@ void writeVtkOutput(Vec * U, size_t Nx, size_t Ny, size_t timestep, size_t my_ra
     vel[2] = 0; // Set z component to 0
 
     // Print Velocity from bottom to top
-    for (size_t j = Ny; j > 0; j--) {
-        for (size_t i = 1; i < Nx + 1; i++) {
+    for (int j = Ny-1; j > -1; j--) {
+        for (size_t i = 0; i < Nx; i++) {
             vel[0] = U[i + j * Nx].comp[0];
             vel[1] = U[i + j * Nx].comp[1];
             Velocity->InsertNextTuple(vel);
@@ -439,7 +435,7 @@ __global__ void doStreaming(Node * fOut, Node * fIn, size_t Nx, size_t Ny){
         Cx = LATTICE_VELOCITIES[q][0];
         Cy = LATTICE_VELOCITIES[q][1];
         fOut[i + j * (Nx + 2)].dir[q]
-        = fIn[ (i - Cx + Nx + 2) % (Nx + 2) + ((j + Cy + Ny + 2) % (Ny + 2)) * (Nx + 2) ].dir[q];
+        = fIn[ (i - Cx + Nx + 2) % (Nx + 2) + ((j - Cy + Ny + 2) % (Ny + 2)) * (Nx + 2) ].dir[q];
     }
 }
 
@@ -508,7 +504,7 @@ int main(int argn, char **args){
     // size_t bSize_x = min(int(Nx + 2), 32);
     // size_t bSize_y = min(int(Ny + 2), 32);
     dim3 gridSize(1, 1);
-    dim3 blockSize(8,8);
+    dim3 blockSize(32,32);
     /// SET INITIAL CONDITIONS
     // Moving wall velocity and zero initialize other memory locations
     Initialize::initMovingwall<<<gridSize, blockSize>>>(fIn, fOut, fEq, U, RHO, uMax, Nx, Ny);
@@ -547,7 +543,7 @@ int main(int argn, char **args){
             std::cout << "Writing vtk file at t = " << t_step << std::endl;
             gpuErrChk(cudaMemcpy(Uin, U, (Nx + 2) * (Ny + 2) * sizeof(Vec), cudaMemcpyDeviceToHost));
             gpuErrChk(cudaDeviceSynchronize());
-            Utils::writeVtkOutput(Uin, Nx, Ny, t_step, 0, input.case_name, input.dict_name);
+            Utils::writeVtkOutput(Uin, Nx+2, Ny+2, t_step, 0, input.case_name, input.dict_name);
         }
     }
 }
