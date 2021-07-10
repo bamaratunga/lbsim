@@ -241,23 +241,24 @@ void writeVtkOutput(Vec * U, size_t Nx, size_t Ny, size_t timestep, size_t my_ra
 namespace Initialize {
 
 __global__ void initMovingwall(Node * fIn, Node * fOut, Node * fEq, Vec * U, double * RHO, double uMax, size_t Nx, size_t Ny){
+
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+
     /// Zero initialize all data
-    for(size_t l = 0; l < Ny + 2; l++){
-        for(size_t k = 0; k < Nx + 2; k++){
-            for(size_t d = 0; d < N_DIM; d++){
-                U[k + l * (Nx + 2)].comp[d] = 0.0;
-            }
-            for(size_t q = 0; q < N_DIRECTIONS; q++){
-                fIn[k + l * (Nx + 2)].dir[q] = 0.0;
-                fOut[k + l * (Nx + 2)].dir[q] = 0.0;
-                fEq[k + l * (Nx + 2)].dir[q] = 0.0;
-            }
-            RHO[k + l * (Nx + 2)] = 1.0;
-        }
+    for(size_t d = 0; d < N_DIM; d++){
+        U[i + j * (Nx + 2)].comp[d] = 0.0;
     }
+    for(size_t q = 0; q < N_DIRECTIONS; q++){
+        fIn[i + j * (Nx + 2)].dir[q] = 0.0;
+        fOut[i + j * (Nx + 2)].dir[q] = 0.0;
+        fEq[i + j * (Nx + 2)].dir[q] = 0.0;
+    }
+    RHO[i + j * (Nx + 2)] = 1.0;
+
     /// Initialize Moving Wall
-    for(size_t k = 0; k < Nx + 2; ++k){
-         U[k + 0 * (Nx + 2)].comp[0] = uMax;
+    if(j == 0){
+         U[i + 0 * (Nx + 2)].comp[0] = uMax;
     }
 }
 
