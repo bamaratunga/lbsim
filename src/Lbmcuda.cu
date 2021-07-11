@@ -253,20 +253,22 @@ __global__ void initMovingwall(Node * fIn, Node * fOut, Node * fEq, Vec * U, dou
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;
 
-    /// Zero initialize all data
-    for(size_t d = 0; d < N_DIM; d++){
-        U[i + j * (Nx + 2)].comp[d] = 0.0;
-    }
-    for(size_t q = 0; q < N_DIRECTIONS; q++){
-        fIn[i + j * (Nx + 2)].dir[q] = 0.0;
-        fOut[i + j * (Nx + 2)].dir[q] = 0.0;
-        fEq[i + j * (Nx + 2)].dir[q] = 0.0;
-    }
-    RHO[i + j * (Nx + 2)] = 1.0;
+    if((i < Nx + 2) && (j < Ny + 2)) {
+        /// Zero initialize all data
+        for(size_t d = 0; d < N_DIM; d++){
+            U[i + j * (Nx + 2)].comp[d] = 0.0;
+        }
+        for(size_t q = 0; q < N_DIRECTIONS; q++){
+            fIn[i + j * (Nx + 2)].dir[q] = 0.0;
+            fOut[i + j * (Nx + 2)].dir[q] = 0.0;
+            fEq[i + j * (Nx + 2)].dir[q] = 0.0;
+        }
+        RHO[i + j * (Nx + 2)] = 1.0;
 
-    /// Initialize Moving Wall
-    if(j == 0){
-         U[i + 0 * (Nx + 2)].comp[0] = uMax;
+        /// Initialize Moving Wall
+        if(j == 0){
+             U[i + 0 * (Nx + 2)].comp[0] = uMax;
+        }
     }
 }
 
@@ -276,17 +278,19 @@ __global__ void initDistfunc(Node * fIn, Vec * U, double * RHO, size_t Nx, size_
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;
 
-    double c_u;
-    double u_u;
-    for (size_t q = 0; q < N_DIRECTIONS; ++q) {
-        c_u = (U[i + j * (Nx + 2)].comp[0] * LATTICE_VELOCITIES[q][0]
-            +  U[i + j * (Nx + 2)].comp[1] * LATTICE_VELOCITIES[q][1]);
-        u_u = (U[i + j * (Nx + 2)].comp[0] * U[i + j * (Nx + 2)].comp[0]
-             + U[i + j * (Nx + 2)].comp[1] * U[i + j * (Nx + 2)].comp[1]);
+    if((i < Nx + 2) && (j < Ny + 2)) {
+        double c_u;
+        double u_u;
+        for (size_t q = 0; q < N_DIRECTIONS; ++q) {
+            c_u = (U[i + j * (Nx + 2)].comp[0] * LATTICE_VELOCITIES[q][0]
+                +  U[i + j * (Nx + 2)].comp[1] * LATTICE_VELOCITIES[q][1]);
+            u_u = (U[i + j * (Nx + 2)].comp[0] * U[i + j * (Nx + 2)].comp[0]
+                 + U[i + j * (Nx + 2)].comp[1] * U[i + j * (Nx + 2)].comp[1]);
 
-        double weight = __ddiv_rn(LATTICE_WEIGHTS[q][0], LATTICE_WEIGHTS[q][1]);
-        fIn[i + j * (Nx + 2)].dir[q] = RHO[i + j * (Nx + 2)] * weight
-                              * ( 1 + 3 * c_u + 4.5 * c_u * c_u - 1.5 * u_u );
+            double weight = __ddiv_rn(LATTICE_WEIGHTS[q][0], LATTICE_WEIGHTS[q][1]);
+            fIn[i + j * (Nx + 2)].dir[q] = RHO[i + j * (Nx + 2)] * weight
+                                  * ( 1 + 3 * c_u + 4.5 * c_u * c_u - 1.5 * u_u );
+        }
     }
 }
 
@@ -307,24 +311,26 @@ __global__ void initDistfunc(Node * fIn, Vec * U, double * RHO, size_t Nx, size_
 namespace Boundary{
 /// SETTING BOUNDARIES
 // Moving wall
-__global__ void setMovingwall(Node * fIn, Vec * U, double * RHO, double uMax, size_t Nx){
+__global__ void setMovingwall(Node * fIn, Vec * U, double * RHO, double uMax, size_t Nx, size_t Ny){
 
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;
 
-    if(j == 0) {
-        // Macroscopic Dirichlet boundary conditions
-        U[i].comp[0] = uMax;
-        U[i].comp[1] = 0.0;
-        RHO[i] = (fIn[i].dir[0] + fIn[i].dir[1] + fIn[i].dir[3]
-        + 2*(fIn[i].dir[2] + fIn[i].dir[5] + fIn[i].dir[6])) / (1 - U[i].comp[1]);
+    if((i < Nx + 2) && (j < Ny + 2)) {
+        if(j == 0) {
+            // Macroscopic Dirichlet boundary conditions
+            U[i].comp[0] = uMax;
+            U[i].comp[1] = 0.0;
+            RHO[i] = (fIn[i].dir[0] + fIn[i].dir[1] + fIn[i].dir[3]
+            + 2*(fIn[i].dir[2] + fIn[i].dir[5] + fIn[i].dir[6])) / (1 - U[i].comp[1]);
 
-        // Microscopic  Zou/He boundary conditions
-        fIn[i].dir[4] = fIn[i].dir[2] - 2 / 3 * RHO[i] * U[i].comp[1];
-        fIn[i].dir[7] = fIn[i].dir[5] + 0.5 * (fIn[i].dir[1] - fIn[i].dir[3])
-                    - 0.5 * (RHO[i] * U[i].comp[0]) - 1/6 * (RHO[i] * U[i].comp[1]);
-        fIn[i].dir[8] = fIn[i].dir[6] - 0.5 * (fIn[i].dir[1] - fIn[i].dir[3])
-                    + 0.5 * (RHO[i] * U[i].comp[0]) - 1/6 * (RHO[i] * U[i].comp[1]);
+            // Microscopic  Zou/He boundary conditions
+            fIn[i].dir[4] = fIn[i].dir[2] - 2 / 3 * RHO[i] * U[i].comp[1];
+            fIn[i].dir[7] = fIn[i].dir[5] + 0.5 * (fIn[i].dir[1] - fIn[i].dir[3])
+                        - 0.5 * (RHO[i] * U[i].comp[0]) - 1/6 * (RHO[i] * U[i].comp[1]);
+            fIn[i].dir[8] = fIn[i].dir[6] - 0.5 * (fIn[i].dir[1] - fIn[i].dir[3])
+                        + 0.5 * (RHO[i] * U[i].comp[0]) - 1/6 * (RHO[i] * U[i].comp[1]);
+        }
     }
 }
 
@@ -335,21 +341,23 @@ __global__ void setBounceback(Node * fOut, Node * fIn, size_t Nx, size_t Ny){
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;
 
-    if (j == Ny + 1) {
-        for(size_t q = 0; q < N_DIRECTIONS; ++q){
-            fOut[i + (Ny + 1) * (Nx + 2)].dir[q] = fIn[i + (Ny + 1) * (Nx + 2)].dir[OPP[q]];
+    if((i < Nx + 2) && (j < Ny + 2)) {
+        if (j == Ny + 1) {
+            for(size_t q = 0; q < N_DIRECTIONS; ++q){
+                fOut[i + (Ny + 1) * (Nx + 2)].dir[q] = fIn[i + (Ny + 1) * (Nx + 2)].dir[OPP[q]];
+            }
         }
-    }
 
-    if ((i == 0) && (j > 0)) {
-        for(size_t q = 0; q < N_DIRECTIONS; ++q){
-            fOut[0 + j * (Nx + 2)].dir[q] = fIn[0 + j * (Nx + 2)].dir[OPP[q]];
+        if ((i == 0) && (j > 0)) {
+            for(size_t q = 0; q < N_DIRECTIONS; ++q){
+                fOut[0 + j * (Nx + 2)].dir[q] = fIn[0 + j * (Nx + 2)].dir[OPP[q]];
+            }
         }
-    }
 
-    if ((i == Nx + 1) && (j > 0)) {
-        for(size_t q = 0; q < N_DIRECTIONS; ++q){
-            fOut[(Nx + 1) + j * (Nx + 2)].dir[q] = fIn[(Nx + 1) + j * (Nx + 2)].dir[OPP[q]];
+        if ((i == Nx + 1) && (j > 0)) {
+            for(size_t q = 0; q < N_DIRECTIONS; ++q){
+                fOut[(Nx + 1) + j * (Nx + 2)].dir[q] = fIn[(Nx + 1) + j * (Nx + 2)].dir[OPP[q]];
+            }
         }
     }
 }
@@ -421,30 +429,39 @@ __global__ void calcQuantities(Node * fIn, Vec * U, double * RHO, size_t Nx, siz
 
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;
-    /// CALCULATE MACROSCOPIC QUANTITIES FOR EACH CELL
-    computeDensity( &fIn[i + j * (Nx + 2)], &RHO[i + j * (Nx + 2)]);
-    computeVelocity( &fIn[i + j * (Nx + 2)], &U[i + j * (Nx + 2)], RHO[i + j * (Nx + 2)]);
+
+    if((i < Nx + 2) && (j < Ny + 2)) {
+        /// CALCULATE MACROSCOPIC QUANTITIES FOR EACH CELL
+        computeDensity( &fIn[i + j * (Nx + 2)], &RHO[i + j * (Nx + 2)]);
+        computeVelocity( &fIn[i + j * (Nx + 2)], &U[i + j * (Nx + 2)], RHO[i + j * (Nx + 2)]);
+    }
 }
 
 __global__ void doCollision(Node * fOut, Node * fIn, Node * fEq, Vec * U, double * RHO,
                                                             double omega, size_t Nx, size_t Ny) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;
-    /// COLLISION STEP
-    computefEq( &fEq[i + j * (Nx + 2)], &U[i + j * (Nx + 2)], RHO[i + j * (Nx + 2)] );
-    computePostCollisionDistributions( &fOut[i + j * (Nx + 2)], &fIn[i + j * (Nx + 2)], &fEq[i + j * (Nx + 2)], omega );
+
+    if((i < Nx + 2) && (j < Ny + 2)) {
+        /// COLLISION STEP
+        computefEq( &fEq[i + j * (Nx + 2)], &U[i + j * (Nx + 2)], RHO[i + j * (Nx + 2)] );
+        computePostCollisionDistributions( &fOut[i + j * (Nx + 2)], &fIn[i + j * (Nx + 2)], &fEq[i + j * (Nx + 2)], omega );
+    }
 }
 
 __global__ void doStreaming(Node * fOut, Node * fIn, size_t Nx, size_t Ny){
 
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;
-    int Cx, Cy;
-    for (size_t q = 0; q < N_DIRECTIONS; ++q) {
-        Cx = LATTICE_VELOCITIES[q][0];
-        Cy = LATTICE_VELOCITIES[q][1];
-        fOut[i + j * (Nx + 2)].dir[q]
-        = fIn[ (i - Cx + Nx + 2) % (Nx + 2) + ((j - Cy + Ny + 2) % (Ny + 2)) * (Nx + 2) ].dir[q];
+
+    if((i < Nx + 2) && (j < Ny + 2)) {
+        int Cx, Cy;
+        for (size_t q = 0; q < N_DIRECTIONS; ++q) {
+            Cx = LATTICE_VELOCITIES[q][0];
+            Cy = LATTICE_VELOCITIES[q][1];
+            fOut[i + j * (Nx + 2)].dir[q]
+            = fIn[ (i - Cx + Nx + 2) % (Nx + 2) + ((j - Cy + Ny + 2) % (Ny + 2)) * (Nx + 2) ].dir[q];
+        }
     }
 }
 
@@ -511,12 +528,14 @@ int main(int argn, char **args){
     Vec * Uin = NULL;
     Uin = (Vec *)malloc((Nx + 2) * (Ny + 2) * sizeof(Vec));
 
-    // size_t gSize_x = max(1, int((Nx + 2)/32));
-    // size_t gSize_y = max(1, int((Ny + 2)/32));
-    // size_t bSize_x = min(int(Nx + 2), 32);
-    // size_t bSize_y = min(int(Ny + 2), 32);
-    dim3 gridSize(3, 3);
-    dim3 blockSize(32,32);
+    /// SET-UP GRID
+    size_t gSize_x = floor((Nx + 2)/32) + 1;
+    size_t gSize_y = floor((Ny + 2)/32) + 1;
+    size_t bSize_x = min(int(Nx + 2), 32);
+    size_t bSize_y = min(int(Ny + 2), 32);
+
+    dim3 gridSize(gSize_x, gSize_y);
+    dim3 blockSize(bSize_x, bSize_y);
     /// SET INITIAL CONDITIONS
     // Moving wall velocity and zero initialize other memory locations
     Initialize::initMovingwall<<<gridSize, blockSize>>>(fIn, fOut, fEq, U, RHO, uMax, Nx, Ny);
@@ -536,7 +555,7 @@ int main(int argn, char **args){
         gpuErrChk(cudaDeviceSynchronize());
 
         /// SETTING BOUNDARIES - Set Moving wall
-        Boundary::setMovingwall<<<gridSize, blockSize>>>(fIn, U, RHO, uMax, Nx);
+        Boundary::setMovingwall<<<gridSize, blockSize>>>(fIn, U, RHO, uMax, Nx, Ny);
         gpuErrChk(cudaDeviceSynchronize());
 
         /// COLLISION STEP
