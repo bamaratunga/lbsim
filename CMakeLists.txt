@@ -7,7 +7,10 @@ project(LBSIM VERSION 1.0 LANGUAGES CXX CUDA)
 # Definition of the C++ Standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
+set(CMAKE_CUDA_STANDARD 14)
+set(CMAKE_CUDA_STANDARD_REQUIRED TRUE)
 
+set(CMAKE_CUDA_ARCHITECTURES off)
 
 # Find packages
 # find_package(MPI)
