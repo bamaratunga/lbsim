@@ -26,6 +26,8 @@ int main(int argn, char **args){
     size_t Nx      = input.x_dim;        // number of cells in x-direction
     size_t Ny      = input.y_dim;        // number of cells in y-direction
     size_t Nt      = input.timesteps;    // number of time steps
+
+    bool output_results = input.output_results;
     size_t plot_interval = input.plot_interval;   // How many timesteps for the next plot update
 
     /// FLOW PARAMETERS
@@ -73,7 +75,7 @@ int main(int argn, char **args){
 *   SIMULATION
 *************************************************************************************/
 
-
+    std::cout << "Running simulation..." << std::endl;
     for(size_t t_step = 0; t_step < Nt; ++t_step){
 
         /// CALCULATE MACROSCOPIC QUANTITIES FOR EACH CELL
@@ -93,7 +95,7 @@ int main(int argn, char **args){
         // STREAMING STEP
         Processes::doStreaming(fIn, fOut, Nx, Ny);
 
-        if(t_step % plot_interval == 0){
+        if(output_results && t_step % plot_interval == 0){
             std::cout << "Writing vtk file at t = " << t_step << std::endl;
             Utils::writeVtkOutput(U, Nx, Ny, t_step, 0, input.case_name, input.dict_name);
         }

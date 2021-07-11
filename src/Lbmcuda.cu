@@ -65,6 +65,7 @@ typedef struct Inputs {
     size_t y_dim;
     size_t timesteps;
     size_t plot_interval;
+    bool output_results;
 
     double reynolds;
     double wall_vel;
@@ -158,6 +159,12 @@ void read_inputs(std::string file_name, Inputs& input) {
                 if (var == "plot_int") file >> input.plot_interval;
                 if (var == "Re") file >> input.reynolds;
                 if (var == "wall_vel") file >> input.wall_vel;
+                if (var == "output_results"){
+                    std::string state;
+                    file >> state;
+                    if (state == "on") input.output_results = true;
+                    else input.output_results = false;
+                }
             }
         }
     }
@@ -472,6 +479,8 @@ int main(int argn, char **args){
     size_t Ny      = input.y_dim;        // number of cells in y-direction
     assert(Nx == Ny);
     size_t Nt      = input.timesteps;    // number of time steps
+
+    bool output_results = input.output_results;
     size_t plot_interval = input.plot_interval;   // How many timesteps for the next plot update
 
     /// FLOW PARAMETERS
@@ -519,7 +528,7 @@ int main(int argn, char **args){
 /*************************************************************************************
 *   SIMULATION
 *************************************************************************************/
-
+    std::cout << "Running simulation..." << std::endl;
     for(size_t t_step = 0; t_step < Nt; ++t_step){
 
         /// CALCULATE MACROSCOPIC QUANTITIES FOR EACH CELL
@@ -542,7 +551,7 @@ int main(int argn, char **args){
         Processes::doStreaming<<<gridSize, blockSize>>>(fIn, fOut, Nx, Ny);
         gpuErrChk(cudaDeviceSynchronize());
 
-        if(t_step % plot_interval == 0){
+        if(output_results && t_step % plot_interval == 0){
             std::cout << "Writing vtk file at t = " << t_step << std::endl;
             gpuErrChk(cudaMemcpy(Uin, U, (Nx + 2) * (Ny + 2) * sizeof(Vec), cudaMemcpyDeviceToHost));
             gpuErrChk(cudaDeviceSynchronize());

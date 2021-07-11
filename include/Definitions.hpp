@@ -49,6 +49,7 @@ typedef struct Inputs {
     size_t y_dim;
     size_t timesteps;
     size_t plot_interval;
+    bool output_results;
 
     double reynolds;
     double wall_vel;

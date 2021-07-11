@@ -75,6 +75,12 @@ void read_inputs(std::string file_name, Inputs& input) {
                 if (var == "plot_int") file >> input.plot_interval;
                 if (var == "Re") file >> input.reynolds;
                 if (var == "wall_vel") file >> input.wall_vel;
+                if (var == "output_results"){
+                    std::string state;
+                    file >> state;
+                    if (state == "on") input.output_results = true;
+                    else input.output_results = false;
+                }
             }
         }
     }
