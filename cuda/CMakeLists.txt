@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.0)
 
 ##******** Definition of the Project
 ##******** Later you can access the project variable like ${CFDLAB_SOURCE_DIR}
-project(LBSIM VERSION 1.0 LANGUAGES CXX CUDA)
+project(LBSIM_CUDA VERSION 1.0 LANGUAGES CXX CUDA)
 
 ##******** Definition of the C++ Standard
 #set(CMAKE_CXX_STANDARD 17)
@@ -47,22 +47,22 @@ if(NOT DEFINED CMAKE_INSTALL_PREFIX)
 endif()
 
 ##******** Creating the executable of our project and the required dependencies
-##******** the executable is called lbsim
-add_executable(lbsim lbm_cuda.cu)
+##******** the executable is called lbsim_cuda
+add_executable(lbsim_cuda lbm_cuda.cu)
 
 ##******** Compiler options
 ##******** Turn on warnings
-# target_compile_options(lbsim PRIVATE -Wall -Wextra)
-target_compile_options(lbsim PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-ftz=false -prec-div=true -prec-sqrt=true>) 
-target_compile_features(lbsim PUBLIC cxx_std_11)
+# target_compile_options(lbsim_cuda PRIVATE -Wall -Wextra)
+target_compile_options(lbsim_cuda PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-ftz=false -prec-div=true -prec-sqrt=true>)
+target_compile_features(lbsim_cuda PUBLIC cxx_std_11)
 
 ##******** if you use external libraries you have to link them like
-# target_link_libraries(lbsim PRIVATE MPI::MPI_CXX)
-target_link_libraries(lbsim PRIVATE ${VTK_LIBRARIES})
+# target_link_libraries(lbsim_cuda PRIVATE MPI::MPI_CXX)
+target_link_libraries(lbsim_cuda PRIVATE ${VTK_LIBRARIES})
 
-set_target_properties(lbsim PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+set_target_properties(lbsim_cuda PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 
 
-# install(TARGETS lbsim DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
+# install(TARGETS lbsim_cuda DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
 ##******** If you write tests, you can include your subdirectory (in this case tests) as done here
 ##******** Testing

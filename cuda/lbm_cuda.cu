@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <cmath>
 #include <cassert>
+#include <chrono>
 #include "cuda.h"
 
 #include <fstream>
@@ -479,6 +480,8 @@ int main(int argn, char **args){
     double nu      = uMax * (Nx + 2) / Re; // kinematic viscosity (is chosen such that the given Raynolds number is achieved)
     double omega   = 2 / (6 * nu + 1);  // relaxation parameter
 
+    auto start = std::chrono::high_resolution_clock::now();
+
     /// Input distribution:
     Node * fIn = NULL;
     gpuErrChk(cudaMalloc(&fIn, (Nx + 2) * (Ny + 2) * sizeof(Node)));
@@ -503,7 +506,7 @@ int main(int argn, char **args){
     // size_t gSize_y = max(1, int((Ny + 2)/32));
     // size_t bSize_x = min(int(Nx + 2), 32);
     // size_t bSize_y = min(int(Ny + 2), 32);
-    dim3 gridSize(1, 1);
+    dim3 gridSize(3, 3);
     dim3 blockSize(32,32);
     /// SET INITIAL CONDITIONS
     // Moving wall velocity and zero initialize other memory locations
@@ -546,4 +549,13 @@ int main(int argn, char **args){
             Utils::writeVtkOutput(Uin, Nx+2, Ny+2, t_step, 0, input.case_name, input.dict_name);
         }
     }
+
+    auto stop = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
+    std::cout << std::endl;
+    std::cout << "LBSIM CUDA VERSION" << std::endl;
+    std::cout << "Simulating " << input.case_name << std::endl;
+    std::cout << "Dimensions = " << Nx + 2 << " x " << Ny + 2 << std::endl;
+    std::cout << "No. of iterations = " << Nt << std::endl;
+    std::cout << "Execution time = " << duration.count() / 1e6 << "s" << std::endl;
 }

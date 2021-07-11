@@ -1,5 +1,6 @@
 #include <iostream>
 #include <cstdlib>
+#include <chrono>
 #include <cmath>
 
 #include "Definitions.hpp"
@@ -32,6 +33,8 @@ int main(int argn, char **args){
     double uMax    = input.wall_vel;    // Velocity of lid
     double nu      = uMax * Nx / Re;    // kinematic viscosity (is chosen such that the given Raynolds number is achieved)
     double omega   = 2 / (6 * nu + 1);  // relaxation parameter
+
+    auto start = std::chrono::high_resolution_clock::now();
 
     /// Input distribution:
     Matrix<Node> fIn  = Matrix<Node>(Nx + 2, Ny + 2);
@@ -95,4 +98,13 @@ int main(int argn, char **args){
             Utils::writeVtkOutput(U, Nx, Ny, t_step, 0, input.case_name, input.dict_name);
         }
     }
+
+    auto stop = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
+    std::cout << std::endl;
+    std::cout << "LBSIM C VERSION" << std::endl;
+    std::cout << "Simulating " << input.case_name << std::endl;
+    std::cout << "Dimensions = " << Nx + 2 << " x " << Ny + 2 << std::endl;
+    std::cout << "No. of iterations = " << Nt << std::endl;
+    std::cout << "Execution time = " << duration.count() / 1e6 << "s" << std::endl;
 }
