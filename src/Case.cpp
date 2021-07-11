@@ -102,7 +102,7 @@ int main(int argn, char **args){
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
     std::cout << std::endl;
-    std::cout << "LBSIM C VERSION" << std::endl;
+    std::cout << "LBSIM CPP VERSION" << std::endl;
     std::cout << "Simulating " << input.case_name << std::endl;
     std::cout << "Dimensions = " << Nx + 2 << " x " << Ny + 2 << std::endl;
     std::cout << "No. of iterations = " << Nt << std::endl;

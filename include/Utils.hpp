@@ -42,7 +42,7 @@ void set_file_names(std::string file_name, std::string& case_name, std::string& 
     case_name.erase(case_name.size() - 4);
     dict_name = temp_dir;
     dict_name.append(case_name);
-    dict_name.append("_Output");
+    dict_name.append("_CPP_Output");
 
     // Create output directory
     std::filesystem::path folder(dict_name);
