@@ -211,7 +211,7 @@ void writeVtkOutput(Vec * U, size_t Nx, size_t Ny, size_t timestep, size_t my_ra
     vel[2] = 0; // Set z component to 0
 
     // Print Velocity from bottom to top
-    for (int j = Ny-1; j > -1; j--) {
+    for (size_t j = 0; j < Ny; j++) {
         for (size_t i = 0; i < Nx; i++) {
             vel[0] = U[i + j * Nx].comp[0];
             vel[1] = U[i + j * Nx].comp[1];
@@ -263,11 +263,12 @@ __global__ void initMovingwall(Node * fIn, Node * fOut, Node * fEq, Vec * U, dou
             fOut[i + j * (Nx + 2)].dir[q] = 0.0;
             fEq[i + j * (Nx + 2)].dir[q] = 0.0;
         }
+        /// Initialize density to 1
         RHO[i + j * (Nx + 2)] = 1.0;
 
         /// Initialize Moving Wall
-        if(j == 0){
-             U[i + 0 * (Nx + 2)].comp[0] = uMax;
+        if(j == Ny + 1){
+             U[i + (Ny + 1) * (Nx + 2)].comp[0] = uMax;
         }
     }
 }
@@ -317,19 +318,19 @@ __global__ void setMovingwall(Node * fIn, Vec * U, double * RHO, double uMax, si
     int j = blockIdx.y * blockDim.y + threadIdx.y;
 
     if((i < Nx + 2) && (j < Ny + 2)) {
-        if(j == 0) {
+        if(j == Ny + 1) {
             // Macroscopic Dirichlet boundary conditions
-            U[i].comp[0] = uMax;
-            U[i].comp[1] = 0.0;
-            RHO[i] = (fIn[i].dir[0] + fIn[i].dir[1] + fIn[i].dir[3]
-            + 2*(fIn[i].dir[2] + fIn[i].dir[5] + fIn[i].dir[6])) / (1 - U[i].comp[1]);
+            U[i + (Ny + 1) * (Nx + 2)].comp[0] = uMax;
+            U[i + (Ny + 1) * (Nx + 2)].comp[1] = 0.0;
+            RHO[i + (Ny + 1) * (Nx + 2)] = (fIn[i + (Ny + 1) * (Nx + 2)].dir[0] + fIn[i + (Ny + 1) * (Nx + 2)].dir[1] + fIn[i + (Ny + 1) * (Nx + 2)].dir[3]
+            + 2*(fIn[i + (Ny + 1) * (Nx + 2)].dir[2] + fIn[i + (Ny + 1) * (Nx + 2)].dir[5] + fIn[i + (Ny + 1) * (Nx + 2)].dir[6])) / (1 - U[i + (Ny + 1) * (Nx + 2)].comp[1]);
 
             // Microscopic  Zou/He boundary conditions
-            fIn[i].dir[4] = fIn[i].dir[2] - 2 / 3 * RHO[i] * U[i].comp[1];
-            fIn[i].dir[7] = fIn[i].dir[5] + 0.5 * (fIn[i].dir[1] - fIn[i].dir[3])
-                        - 0.5 * (RHO[i] * U[i].comp[0]) - 1/6 * (RHO[i] * U[i].comp[1]);
-            fIn[i].dir[8] = fIn[i].dir[6] - 0.5 * (fIn[i].dir[1] - fIn[i].dir[3])
-                        + 0.5 * (RHO[i] * U[i].comp[0]) - 1/6 * (RHO[i] * U[i].comp[1]);
+            fIn[i + (Ny + 1) * (Nx + 2)].dir[4] = fIn[i + (Ny + 1) * (Nx + 2)].dir[2] - 2 / 3 * RHO[i + (Ny + 1) * (Nx + 2)] * U[i + (Ny + 1) * (Nx + 2)].comp[1];
+            fIn[i + (Ny + 1) * (Nx + 2)].dir[7] = fIn[i + (Ny + 1) * (Nx + 2)].dir[5] + 0.5 * (fIn[i + (Ny + 1) * (Nx + 2)].dir[1] - fIn[i + (Ny + 1) * (Nx + 2)].dir[3])
+                        - 0.5 * (RHO[i + (Ny + 1) * (Nx + 2)] * U[i + (Ny + 1) * (Nx + 2)].comp[0]) - 1/6 * (RHO[i + (Ny + 1) * (Nx + 2)] * U[i + (Ny + 1) * (Nx + 2)].comp[1]);
+            fIn[i + (Ny + 1) * (Nx + 2)].dir[8] = fIn[i + (Ny + 1) * (Nx + 2)].dir[6] - 0.5 * (fIn[i + (Ny + 1) * (Nx + 2)].dir[1] - fIn[i + (Ny + 1) * (Nx + 2)].dir[3])
+                        + 0.5 * (RHO[i + (Ny + 1) * (Nx + 2)] * U[i + (Ny + 1) * (Nx + 2)].comp[0]) - 1/6 * (RHO[i + (Ny + 1) * (Nx + 2)] * U[i + (Ny + 1) * (Nx + 2)].comp[1]);
         }
     }
 }
@@ -342,19 +343,19 @@ __global__ void setBounceback(Node * fOut, Node * fIn, size_t Nx, size_t Ny){
     int j = blockIdx.y * blockDim.y + threadIdx.y;
 
     if((i < Nx + 2) && (j < Ny + 2)) {
-        if (j == Ny + 1) {
+        if (j == 0) {
             for(size_t q = 0; q < N_DIRECTIONS; ++q){
-                fOut[i + (Ny + 1) * (Nx + 2)].dir[q] = fIn[i + (Ny + 1) * (Nx + 2)].dir[OPP[q]];
+                fOut[i + 0 * (Nx + 2)].dir[q] = fIn[i + 0 * (Nx + 2)].dir[OPP[q]];
             }
         }
 
-        if ((i == 0) && (j > 0)) {
+        if ((i == 0) && (j < Ny + 1)) {
             for(size_t q = 0; q < N_DIRECTIONS; ++q){
                 fOut[0 + j * (Nx + 2)].dir[q] = fIn[0 + j * (Nx + 2)].dir[OPP[q]];
             }
         }
 
-        if ((i == Nx + 1) && (j > 0)) {
+        if ((i == Nx + 1) && (j < Ny + 1)) {
             for(size_t q = 0; q < N_DIRECTIONS; ++q){
                 fOut[(Nx + 1) + j * (Nx + 2)].dir[q] = fIn[(Nx + 1) + j * (Nx + 2)].dir[OPP[q]];
             }
