@@ -21,14 +21,14 @@ The purpose of developing LBSIM was to answer whether we can create a fluid dyna
 
 We also calculated the speedup for different sizes of our GPU implementations:
 
-| Size        |	Sequential only time (s) |	GPU time (s) | Speedup          |
+| Size        |	Sequential LBSIM time (s) |	GPU time (s)       | Speedup          |
 | ----------- | ------------------------- | ------------------ | ---------------- |
-| 50x50	      | 5.03	                 | 2.39	             | 2.10460251046025 |
-| 100x100     | 23.8808	                 | 9.49319            | 2.51557168875794 |
-| 300x300     | 291.828	                 | 104.871	     | 2.78273307205996 |
-| 500x500     | 838.177	                 | 249.946	     | 3.35343234138574 |
-| 800x800     | 2442.92	                 | 711.123	     | 3.43529881609792 |
-| 1000x1000   | Na	                 | 1236.38	     | Na               |
+| 50x50	      | 5.03	                  | 2.39	           | 2.10460251046025 |
+| 100x100     | 23.8808	                  | 9.49319            | 2.51557168875794 |
+| 300x300     | 291.828	                  | 104.871	           | 2.78273307205996 |
+| 500x500     | 838.177	                  | 249.946	           | 3.35343234138574 |
+| 800x800     | 2442.92	                  | 711.123	           | 3.43529881609792 |
+| 1000x1000   | Na	                      | 1236.38	           | Na               |
 
 In bigger problems, the parts of the code that we parallelize would increase, resulting in greater speed-ups at the end.
 
