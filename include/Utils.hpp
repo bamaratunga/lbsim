@@ -131,7 +131,7 @@ void writeVtkOutput(Matrix<Vec>& U, size_t Nx, size_t Ny, size_t timestep, size_
     vel[2] = 0; // Set z component to 0
 
     // Print Velocity from bottom to top
-    for (size_t j = Ny; j > 0; j--) {
+    for (size_t j = 1; j < Ny + 1; j++) {
         for (size_t i = 1; i < Nx + 1; i++) {
             vel[0] = U(i,j).comp[0];
             vel[1] = U(i,j).comp[1];

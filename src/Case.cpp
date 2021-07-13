@@ -67,7 +67,7 @@ int main(int argn, char **args){
 
     /// SET INITIAL CONDITIONS
     // Moving wall velocity
-    Initialize::initMovingwall(U, uMax, Nx);
+    Initialize::initMovingwall(U, uMax, Nx, Ny);
     // Microscopic quantities
     Initialize::initDistfunc(fIn, U, RHO, Nx, Ny);
 
@@ -83,7 +83,7 @@ int main(int argn, char **args){
 
         /// SETTING BOUNDARIES
         // Moving wall
-        Boundary::setMovingwall(fIn, U, RHO, uMax, Nx);
+        Boundary::setMovingwall(fIn, U, RHO, uMax, Nx, Ny);
 
         /// COLLISION STEP
         Processes::doCollision(fOut, fIn, fEq, U, RHO, omega, Nx, Ny);

@@ -6,7 +6,7 @@
 
 namespace Initialize {
 
-    void initMovingwall(Matrix<Vec>& U, double uMax, size_t Nx);
+    void initMovingwall(Matrix<Vec>& U, double uMax, size_t Nx, size_t Ny);
 
     void initDistfunc(Matrix<Node>& fIn, Matrix<Vec>& U, Matrix<double>& RHO,
                                                             size_t Nx, size_t Ny);

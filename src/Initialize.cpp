@@ -4,10 +4,10 @@
 
 namespace Initialize {
 
-void initMovingwall(Matrix<Vec>& U, double uMax, size_t Nx){
+void initMovingwall(Matrix<Vec>& U, double uMax, size_t Nx, size_t Ny){
     /// Initialize Moving Wall
     for(size_t i = 0; i < Nx + 2; ++i){
-         U(i, 0).comp[0] = uMax;
+         U(i, Ny + 1).comp[0] = uMax;
     }
 }
 
