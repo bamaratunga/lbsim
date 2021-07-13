@@ -30,7 +30,7 @@ We also calculated the speedup for different sizes of our GPU implementations:
 | 800x800     | 2442.92	                 | 711.123	     | 3.43529881609792 |
 | 1000x1000   | Na	                 | 1236.38	     | Na               |
 
-In bigger the problems, the parts of the code that we parallelize would increase which results in greater speed ups at the end.
+In bigger problems, the parts of the code that we parallelize would increase, resulting in greater speed-ups at the end.
 
 ## Initialization:
 There is a file in the repository called LidDrivenCavity.dat in which you can change different parameters such as Reynolds number, number of the cells, time steps, and wall velocities to get different results.
