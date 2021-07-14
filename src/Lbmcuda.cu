@@ -426,8 +426,8 @@ __device__ void computePostCollisionDistributions(Node * outputNode, Node * curr
     }
 }
 
-__global__ void calcQuantities(Node * fIn, Vec * U, double * RHO, size_t Nx, size_t Ny){
-
+__global__ void doCollision(Node * fOut, Node * fIn, Node * fEq, Vec * U, double * RHO,
+                                                            double omega, size_t Nx, size_t Ny) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;
 
@@ -435,15 +435,6 @@ __global__ void calcQuantities(Node * fIn, Vec * U, double * RHO, size_t Nx, siz
         /// CALCULATE MACROSCOPIC QUANTITIES FOR EACH CELL
         computeDensity( &fIn[i + j * (Nx + 2)], &RHO[i + j * (Nx + 2)]);
         computeVelocity( &fIn[i + j * (Nx + 2)], &U[i + j * (Nx + 2)], RHO[i + j * (Nx + 2)]);
-    }
-}
-
-__global__ void doCollision(Node * fOut, Node * fIn, Node * fEq, Vec * U, double * RHO,
-                                                            double omega, size_t Nx, size_t Ny) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    int j = blockIdx.y * blockDim.y + threadIdx.y;
-
-    if((i < Nx + 2) && (j < Ny + 2)) {
         /// COLLISION STEP
         computefEq( &fEq[i + j * (Nx + 2)], &U[i + j * (Nx + 2)], RHO[i + j * (Nx + 2)] );
         computePostCollisionDistributions( &fOut[i + j * (Nx + 2)], &fIn[i + j * (Nx + 2)], &fEq[i + j * (Nx + 2)], omega );
@@ -530,20 +521,20 @@ int main(int argn, char **args){
     Uin = (Vec *)malloc((Nx + 2) * (Ny + 2) * sizeof(Vec));
 
     /// SET-UP GRID
-    size_t gSize_x = floor((Nx + 2)/32) + 1;
-    size_t gSize_y = floor((Ny + 2)/32) + 1;
-    size_t bSize_x = min(int(Nx + 2), 32);
-    size_t bSize_y = min(int(Ny + 2), 32);
+    size_t gSize_x = floor((Nx + 2)/8) + 1;
+    size_t gSize_y = floor((Ny + 2)/16) + 1;
+    size_t bSize_x = min(int(Nx + 2), 8);
+    size_t bSize_y = min(int(Ny + 2), 16);
 
     dim3 gridSize(gSize_x, gSize_y);
     dim3 blockSize(bSize_x, bSize_y);
     /// SET INITIAL CONDITIONS
     // Moving wall velocity and zero initialize other memory locations
     Initialize::initMovingwall<<<gridSize, blockSize>>>(fIn, fOut, fEq, U, RHO, uMax, Nx, Ny);
-    gpuErrChk(cudaDeviceSynchronize());
+    // gpuErrChk(cudaDeviceSynchronize());
     // Initialize Microscopic quantities
     Initialize::initDistfunc<<<gridSize, blockSize>>>(fIn, U, RHO, Nx, Ny);
-    gpuErrChk(cudaDeviceSynchronize());
+    // gpuErrChk(cudaDeviceSynchronize());
 
 /*************************************************************************************
 *   SIMULATION
@@ -551,17 +542,13 @@ int main(int argn, char **args){
     std::cout << "Running simulation..." << std::endl;
     for(size_t t_step = 0; t_step < Nt; ++t_step){
 
-        /// CALCULATE MACROSCOPIC QUANTITIES FOR EACH CELL
-        Processes::calcQuantities<<<gridSize, blockSize>>>(fIn, U, RHO, Nx, Ny);
-        gpuErrChk(cudaDeviceSynchronize());
-
         /// SETTING BOUNDARIES - Set Moving wall
         Boundary::setMovingwall<<<gridSize, blockSize>>>(fIn, U, RHO, uMax, Nx, Ny);
-        gpuErrChk(cudaDeviceSynchronize());
+        // gpuErrChk(cudaDeviceSynchronize());
 
         /// COLLISION STEP
         Processes::doCollision<<<gridSize, blockSize>>>(fOut, fIn, fEq, U, RHO, omega, Nx, Ny);
-        gpuErrChk(cudaDeviceSynchronize());
+        // gpuErrChk(cudaDeviceSynchronize());
 
         /// SETTING BOUNDARIES - Set bounce back cells
         Boundary::setBounceback<<<gridSize, blockSize>>>(fOut, fIn, Nx, Ny);
@@ -569,12 +556,12 @@ int main(int argn, char **args){
 
         /// STREAMING STEP
         Processes::doStreaming<<<gridSize, blockSize>>>(fIn, fOut, Nx, Ny);
-        gpuErrChk(cudaDeviceSynchronize());
+        // gpuErrChk(cudaDeviceSynchronize());
 
         if(output_results && t_step % plot_interval == 0){
             std::cout << "Writing vtk file at t = " << t_step << std::endl;
             gpuErrChk(cudaMemcpy(Uin, U, (Nx + 2) * (Ny + 2) * sizeof(Vec), cudaMemcpyDeviceToHost));
-            gpuErrChk(cudaDeviceSynchronize());
+            // gpuErrChk(cudaDeviceSynchronize());
             Utils::writeVtkOutput(Uin, Nx+2, Ny+2, t_step, 0, input.case_name, input.dict_name);
         }
     }
